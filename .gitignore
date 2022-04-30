@@ -1,0 +1,16 @@
+/*
+!/.gitignore
+
+!/model
+/model/**
+
+!/model/rtsp-server.h
+!/model/rtsp-server.cc
+!/model/rtsp-client.h
+!/model/rtsp-client.cc
+
+!/helper
+/helper/**
+
+!/helper/rtsp-client-server-helper.h
+!/helper/rtsp-client-server-helper.cc
