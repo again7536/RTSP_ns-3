@@ -14,3 +14,5 @@
 
 !/helper/rtsp-client-server-helper.h
 !/helper/rtsp-client-server-helper.cc
+
+!wscript

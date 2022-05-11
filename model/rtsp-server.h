@@ -1,3 +1,5 @@
+/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
+
 /*
 
 three-gpp-http-server.h랑 server.java 참고해서 만들었습니다.
@@ -18,7 +20,7 @@ three-gpp-http-server.h랑 server.java 참고해서 만들었습니다.
 #include <ns3/application.h>
 #include <ns3/address.h>
 #include <ns3/traced-callback.h>
-#include <map>
+#include <ns3/socket.h>
 #include <ostream>
 
 namespace ns3 {
@@ -28,7 +30,7 @@ class RtspServer : public Application
 public:
     static TypeId GetTypeId (void);
     RtspServer();
-    ~RtspServer();
+    virtual ~RtspServer();
 
     enum State_t
     {
@@ -48,44 +50,49 @@ private:
     /**************************************************
     *                   소켓 콜백
     **************************************************/
-    //Parse RTSP Request
-    void ReceivedDataCallback (Ptr<Socket> socket);
+    //Handle RTSP Request
+    void HandleRtspReceive (Ptr<Socket> socket);
     //Send RTSP Response
     void SendCallback (Ptr<Socket> socket, uint32_t availableBufferSize);
+    //Handle RTP Request
+    void HandleRtpReceive (Ptr<Socket> socket);
+    //Handle RTCP Request
+    void HandleRtcpReceive (Ptr<Socket> socket);
 
     /**************************************************
     *                    메소드
     ***************************************************/
-    void DoDispose();
-    void StartApplication();
-    void StopApplication();
-    
-    //Handler for timer
-    void ActionPerformed();
+    virtual void DoDispose();
+    virtual void StartApplication();
+    virtual void StopApplication();
+
+    void ScheduleRtpSend();
 
     /**************************************************
     *                      변수
     ***************************************************/
-    Ptr<Socket> m_initialSocket;
+    Ptr<Socket> m_rtspSocket;
+    Ptr<Socket> m_rtpSocket;
+    Ptr<Socket> m_rtcpSocket;
     Address m_localAddress;          //Server IP address
     Address m_clientAddress;         //Client IP address
     uint16_t m_rtpPort = 0;          //destination port for RTP packets  (given by the RTSP Client)
+    uint16_t m_rtcpPort = 0;
     uint16_t m_rtspPort = 0;
-    uint32_t m_mtuSize = 0;
 
-    int m_imagenb = 0;               //image nb of the image currently transmitted
+    uint32_t m_imagenb = 0;               //image nb of the image currently transmitted
     //VideoStream video;             //VideoStream object used to access video frames
 
     //Timer timer;                   //timer used to send the images at the video frame rate
     //byte[] buf;                    //buffer used to store the images to send to the client 
-    int m_sendDelay;                 //the delay to send images over the wire. Ideally should be
+    uint64_t m_sendDelay;                 //the delay to send images over the wire. Ideally should be
                                      //equal to the frame rate of the video file, but may be 
                                      //adjusted when congestion is detected.
 
     //RTSP variables
     //----------------
     int m_seqNum;
-    State_t m_state = 0;
+    State_t m_state = INIT;
     
     const static int FRAME_PERIOD = 100; //Frame period of the video to stream, in ms
     const static int MJPEG_TYPE = 26;    //RTP payload type for MJPEG video
@@ -97,33 +104,7 @@ private:
  
     const static int RTCP_RCV_PORT = 19001; //port where the client will receive the RTP packets
     const static int RTCP_PERIOD = 400;     //How often to check for control events
-    const static String CRLF = "\r\n";
-}
-
-
-//Controls RTP sending rate based on traffic
-class CongestionController{
-}
-
-//Listeners for RTCP packets sent from client
-class RtcpReceiver {
-private:
-    // private Timer rtcpTimer;
-    // private byte[] rtcpBuf;
-    // int interval;
-}
-
-//Translate an image to different encoding or quality
-class ImageTranslator {
-private:
-        // float compressionQuality;
-        // ByteArrayOutputStream baos;
-        // BufferedImage image;
-        // Iterator<ImageWriter>writers;
-        // ImageWriter writer;
-        // ImageWriteParam param;
-        // ImageOutputStream ios;
-}
+};
 
 }
 
