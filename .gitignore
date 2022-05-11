@@ -1,18 +1,24 @@
 /*
 !/.gitignore
+!/README.md
 
-!/model
-/model/**
+# recursively include and exclude
+!/src
+/src/**
+!/src/applications
+/src/applications/**
 
-!/model/rtsp-server.h
-!/model/rtsp-server.cc
-!/model/rtsp-client.h
-!/model/rtsp-client.cc
+!/src/applications/model
+/src/applications/model/**
+!/src/applications/model/rtsp-server.h
+!/src/applications/model/rtsp-server.cc
+!/src/applications/model/rtsp-client.h
+!/src/applications/model/rtsp-client.cc
+!/src/applications/helper
 
-!/helper
-/helper/**
+/src/applications/helper/**
+!/src/applications/helper/rtsp-client-server-helper.h
+!/src/applications/helper/rtsp-client-server-helper.cc
+!/src/applications/wscript
 
-!/helper/rtsp-client-server-helper.h
-!/helper/rtsp-client-server-helper.cc
-
-!wscript
+!/scratch

@@ -52,7 +52,7 @@ private:
     virtual void StartApplication();
     virtual void StopApplication();
 
-    void ScheduleRtpSend();
+    void SendRtspPacket();
 
     /**************************************************
     *                      변수
@@ -61,10 +61,12 @@ private:
     Ptr<Socket> m_rtpSocket;
     Ptr<Socket> m_rtcpSocket;
     Address m_localAddress;          //Client IP address
-    Address m_clientAddress;         //Client IP address
-    uint16_t m_rtpPort = 0;          //destination port for RTP packets  (given by the RTSP Client)
-    uint16_t m_rtcpPort = 0;
-    uint16_t m_rtspPort = 0;
+    Address m_remoteAddress;         //Client IP address
+    uint16_t m_rtpPort;          //destination port for RTP packets  (given by the RTSP Client)
+    uint16_t m_rtcpPort;
+    uint16_t m_rtspPort;
+
+    EventId m_sendEvent;
 };
 
 }

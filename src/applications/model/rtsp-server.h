@@ -50,6 +50,8 @@ private:
     /**************************************************
     *                   소켓 콜백
     **************************************************/
+    bool ConnectionRequestCallback (Ptr<Socket> socket, const Address &address);
+    void NewConnectionCreatedCallback (Ptr<Socket> socket, const Address &address);
     //Handle RTSP Request
     void HandleRtspReceive (Ptr<Socket> socket);
     //Send RTSP Response
@@ -76,11 +78,11 @@ private:
     Ptr<Socket> m_rtcpSocket;
     Address m_localAddress;          //Server IP address
     Address m_clientAddress;         //Client IP address
-    uint16_t m_rtpPort = 0;          //destination port for RTP packets  (given by the RTSP Client)
-    uint16_t m_rtcpPort = 0;
-    uint16_t m_rtspPort = 0;
+    uint16_t m_rtpPort;          //destination port for RTP packets  (given by the RTSP Client)
+    uint16_t m_rtcpPort;
+    uint16_t m_rtspPort;
 
-    uint32_t m_imagenb = 0;               //image nb of the image currently transmitted
+    uint32_t m_imagenb;               //image nb of the image currently transmitted
     //VideoStream video;             //VideoStream object used to access video frames
 
     //Timer timer;                   //timer used to send the images at the video frame rate
@@ -104,6 +106,10 @@ private:
  
     const static int RTCP_RCV_PORT = 19001; //port where the client will receive the RTP packets
     const static int RTCP_PERIOD = 400;     //How often to check for control events
+
+    //RTP variables
+    //----------------
+    EventId         m_sendEvent;
 };
 
 }

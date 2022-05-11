@@ -45,6 +45,8 @@ public:
    */
   RtspServerHelper ();
 
+  RtspServerHelper (Address serverAddress);
+
   /**
    * Create RtspServerHelper which will make life easier for people trying
    * to set up simulations with udp-client-server application.

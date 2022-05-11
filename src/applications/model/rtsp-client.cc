@@ -31,6 +31,17 @@ RtspClient::GetTypeId (void)
         .SetParent<Application> ()
         .SetGroupName("Applications")
         .AddConstructor<RtspClient>()
+        .AddAttribute ("RemoteAddress",
+                    "The local address of the server, "
+                    "i.e., the address on which to bind the Rx socket.",
+                    AddressValue (),
+                    MakeAddressAccessor (&RtspClient::m_remoteAddress),
+                    MakeAddressChecker ())
+        .AddAttribute ("RtspPort",
+                    "Port on which the application listen for incoming packets.",
+                    UintegerValue (80), // the default HTTP port
+                    MakeUintegerAccessor (&RtspClient::m_rtspPort),
+                    MakeUintegerChecker<uint16_t> ())
     ;
     return tid;
 }
@@ -38,6 +49,9 @@ RtspClient::GetTypeId (void)
 RtspClient::RtspClient ()
 {
     NS_LOG_FUNCTION (this);
+    m_rtspPort = 9;
+    m_rtcpPort = 10;
+    m_rtpPort = 11;
 }
 
 RtspClient::~RtspClient ()
@@ -81,16 +95,15 @@ RtspClient::StartApplication ()
         // Creating a TCP socket to connect to the Client.
         m_rtspSocket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
 
-        if (Ipv4Address::IsMatchingType (m_localAddress))
-        {
-            const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
+        if (Ipv4Address::IsMatchingType (m_remoteAddress))
+        {   
+            m_rtspSocket->Bind();
+
+            const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_remoteAddress);
             const InetSocketAddress inetSocket = InetSocketAddress (ipv4, m_rtspPort);
-            if (m_rtpSocket->Bind (inetSocket) == -1)
-              {
-                NS_FATAL_ERROR ("Failed to bind socket");
-              }
+            m_rtspSocket->Connect (inetSocket);
         }
-        m_rtspSocket->Listen ();
+       
     } // end of `if (m_rtspSocket == 0)`
 
     NS_ASSERT_MSG (m_rtspSocket != 0, "Failed creating RTSP socket.");
@@ -126,13 +139,15 @@ RtspClient::StartApplication ()
     NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
 
     m_rtpSocket->SetRecvCallback (MakeCallback (&RtspClient::HandleRtcpReceive, this));
+
+    m_sendEvent = Simulator::Schedule(Seconds(0.1), &RtspClient::SendRtspPacket, this);
 } // end of `void StartApplication ()`
 
 void
 RtspClient::StopApplication ()
 {
   NS_LOG_FUNCTION (this);
-
+  Simulator::Cancel(m_sendEvent);
   // Stop listening.
   if (m_rtspSocket != 0)
     {
@@ -165,7 +180,24 @@ RtspClient::HandleRtspReceive (Ptr<Socket> socket)
     uint8_t* msg = new uint8_t[packet->GetSize()+1];
     packet->CopyData(msg, packet->GetSize());
     std::istringstream strin(std::string((char*)msg), std::ios::in);
+    
+    delete msg;
   }
+}
+
+//RTSP Sender
+void
+RtspClient::SendRtspPacket ()
+{
+  NS_LOG_FUNCTION(this);
+
+  NS_ASSERT (m_sendEvent.IsExpired ());
+  uint8_t buf[100] = "PLAY\n";
+  Ptr<Packet> packet = Create<Packet>(buf, 100);
+  int ret = m_rtspSocket->Send(packet);
+  NS_LOG_INFO("Client Send :" << ret);
+  
+  m_sendEvent = Simulator::Schedule(Seconds(1), &RtspClient::SendRtspPacket, this);
 }
 
 //RTP handler
@@ -181,14 +213,8 @@ RtspClient::HandleRtpReceive(Ptr<Socket> socket)
   {
     socket->GetSockName (localAddress);
 
-    if(m_clientAddress != from)
-    {
-      m_clientAddress = from;
-    }
-
     uint8_t* msg = new uint8_t[packet->GetSize()+1];
     packet->CopyData(msg, packet->GetSize());
-    std::cout<< '\n' << msg << '\n';
   }
 }
 
@@ -202,14 +228,9 @@ RtspClient::HandleRtcpReceive(Ptr<Socket> socket)
   Address from;
   Address localAddress;
   while ((packet = socket->RecvFrom (from)))
-    {
-      socket->GetSockName (localAddress);
-
-      if(m_clientAddress != from)
-      {
-        m_clientAddress = from;
-      }
-    }   
+  {
+    socket->GetSockName (localAddress);
+  }   
 }
 
 }

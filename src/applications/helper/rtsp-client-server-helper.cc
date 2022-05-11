@@ -28,6 +28,12 @@ RtspServerHelper::RtspServerHelper ()
   m_factory.SetTypeId (RtspServer::GetTypeId ());
 }
 
+RtspServerHelper::RtspServerHelper (Address serverAddress)
+{
+  m_factory.SetTypeId (RtspServer::GetTypeId ());
+  SetAttribute ("LocalAddress", AddressValue (serverAddress));
+}
+
 RtspServerHelper::RtspServerHelper (uint16_t port)
 {
   m_factory.SetTypeId (RtspServer::GetTypeId ());
