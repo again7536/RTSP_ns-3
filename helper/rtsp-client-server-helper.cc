@@ -18,9 +18,6 @@
  * Author: Mohamed Amine Ismail <amine.ismail@sophia.inria.fr>
  */
 #include "rtsp-client-server-helper.h"
-#include "ns3/udp-server.h"
-#include "ns3/udp-client.h"
-#include "ns3/udp-trace-client.h"
 #include "ns3/uinteger.h"
 #include "ns3/string.h"
 

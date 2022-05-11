@@ -26,7 +26,7 @@ def build(bld):
         'helper/udp-client-server-helper.cc',
         'helper/udp-echo-helper.cc',
         'helper/three-gpp-http-helper.cc',
-        'helper/rtsp-server-client.cc'
+        'helper/rtsp-client-server-helper.cc'
         ]
 
     applications_test = bld.create_ns3_module_test_library('applications')
@@ -61,7 +61,7 @@ def build(bld):
         'helper/udp-client-server-helper.h',
         'helper/udp-echo-helper.h',
         'helper/three-gpp-http-helper.h',
-        'helper/rtsp-server-client.h'
+        'helper/rtsp-client-server-helper.h'
         ]
     
     if (bld.env['ENABLE_EXAMPLES']):

@@ -1,4 +1,6 @@
-#include "rtsp-client.h"
+/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
+
+#include <ns3/rtsp-client.h>
 
 #include <sstream>
 #include <ns3/log.h>
@@ -30,9 +32,15 @@ RtspClient::GetTypeId (void)
         .SetGroupName("Applications")
         .AddConstructor<RtspClient>()
     ;
+    return tid;
 }
 
 RtspClient::RtspClient ()
+{
+    NS_LOG_FUNCTION (this);
+}
+
+RtspClient::~RtspClient ()
 {
     NS_LOG_FUNCTION (this);
 }
@@ -73,18 +81,21 @@ RtspClient::StartApplication ()
         // Creating a TCP socket to connect to the Client.
         m_rtspSocket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
 
-        int ret;
         if (Ipv4Address::IsMatchingType (m_localAddress))
         {
             const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
             const InetSocketAddress inetSocket = InetSocketAddress (ipv4, m_rtspPort);
+            if (m_rtpSocket->Bind (inetSocket) == -1)
+              {
+                NS_FATAL_ERROR ("Failed to bind socket");
+              }
         }
-        ret = m_rtspSocket->Listen ();
+        m_rtspSocket->Listen ();
     } // end of `if (m_rtspSocket == 0)`
 
     NS_ASSERT_MSG (m_rtspSocket != 0, "Failed creating RTSP socket.");
 
-    m_rtspSocket->SetRecvCallback (MakeCallback (&HandleRtspReceive, this));
+    m_rtspSocket->SetRecvCallback (MakeCallback (&RtspClient::HandleRtspReceive, this));
 
     /* RTP 소켓 초기화 */
     if (m_rtpSocket == 0)
@@ -99,7 +110,7 @@ RtspClient::StartApplication ()
     }
     NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
 
-    m_rtpSocket->SetRecvCallback (MakeCallback (&HandleRtpReceive, this));
+    m_rtpSocket->SetRecvCallback (MakeCallback (&RtspClient::HandleRtpReceive, this));
 
     /* RTCP 소켓 초기화 */
     if (m_rtcpSocket == 0)
@@ -114,8 +125,31 @@ RtspClient::StartApplication ()
     }
     NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
 
-    m_rtpSocket->SetRecvCallback (MakeCallback (&HandleRtcpReceive, this));
+    m_rtpSocket->SetRecvCallback (MakeCallback (&RtspClient::HandleRtcpReceive, this));
 } // end of `void StartApplication ()`
+
+void
+RtspClient::StopApplication ()
+{
+  NS_LOG_FUNCTION (this);
+
+  // Stop listening.
+  if (m_rtspSocket != 0)
+    {
+      m_rtspSocket->Close ();
+      m_rtspSocket->SetAcceptCallback (MakeNullCallback<bool, Ptr<Socket>, const Address &> (),
+                                          MakeNullCallback<void, Ptr<Socket>, const Address &> ());
+      m_rtspSocket->SetCloseCallbacks (MakeNullCallback<void, Ptr<Socket> > (),
+                                          MakeNullCallback<void, Ptr<Socket> > ());
+      m_rtspSocket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+      m_rtspSocket->SetSendCallback (MakeNullCallback<void, Ptr<Socket>, uint32_t > ());
+    }
+  if (m_rtpSocket != 0) 
+  {
+    m_rtpSocket->Close();
+    m_rtpSocket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+  }
+}
 
 //RTSP handler
 void

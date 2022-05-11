@@ -1,3 +1,5 @@
+/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
+
 /*
 
 three-gpp-http-server.h랑 server.java 참고해서 만들었습니다.
@@ -28,7 +30,7 @@ class RtspServer : public Application
 public:
     static TypeId GetTypeId (void);
     RtspServer();
-    ~RtspServer();
+    virtual ~RtspServer();
 
     enum State_t
     {
@@ -60,9 +62,9 @@ private:
     /**************************************************
     *                    메소드
     ***************************************************/
-    void DoDispose();
-    void StartApplication();
-    void StopApplication();
+    virtual void DoDispose();
+    virtual void StartApplication();
+    virtual void StopApplication();
 
     void ScheduleRtpSend();
 

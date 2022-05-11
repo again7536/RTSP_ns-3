@@ -25,8 +25,8 @@
 #include "ns3/node-container.h"
 #include "ns3/object-factory.h"
 #include "ns3/ipv4-address.h"
-#include "../model/rtsp-server.h"
-#include "../model/rtsp-client.h"
+#include "ns3/rtsp-server.h"
+#include "ns3/rtsp-client.h"
 
 namespace ns3 {
 /**

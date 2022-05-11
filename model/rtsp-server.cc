@@ -1,4 +1,5 @@
-#include "rtsp-server.h"
+/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
+#include <ns3/rtsp-server.h>
 
 #include <sstream>
 #include <ns3/log.h>
@@ -61,6 +62,13 @@ RtspServer::RtspServer ()
     m_sendDelay = FRAME_PERIOD;
 }
 
+RtspServer::~RtspServer ()
+{
+    NS_LOG_FUNCTION (this);
+    
+    m_sendDelay = FRAME_PERIOD;
+}
+
 void
 RtspServer::DoDispose ()
 {
@@ -113,7 +121,7 @@ RtspServer::StartApplication ()
           m_rtspSocket->Listen ();
         }
         NS_ASSERT_MSG (m_rtspSocket != 0, "Failed creating RTSP socket.");
-        m_rtspSocket->SetRecvCallback (MakeCallback (&HandleRtspReceive, this));
+        m_rtspSocket->SetRecvCallback (MakeCallback (&RtspServer::HandleRtspReceive, this));
         m_state = READY;
 
         /* 
@@ -130,7 +138,7 @@ RtspServer::StartApplication ()
             }
         }
         NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
-        m_rtpSocket->SetRecvCallback (MakeCallback (&HandleRtpReceive, this));
+        m_rtpSocket->SetRecvCallback (MakeCallback (&RtspServer::HandleRtpReceive, this));
 
         /* 
           RTCP 소켓 초기화 
@@ -146,7 +154,7 @@ RtspServer::StartApplication ()
             }
         }
         NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
-        m_rtpSocket->SetRecvCallback (MakeCallback (&HandleRtcpReceive, this));
+        m_rtpSocket->SetRecvCallback (MakeCallback (&RtspServer::HandleRtcpReceive, this));
     }
     else
     {
@@ -254,9 +262,9 @@ RtspServer::HandleRtcpReceive(Ptr<Socket> socket)
       }
       uint8_t* msg = new uint8_t[packet->GetSize()+1];
       packet->CopyData(msg, packet->GetSize());
-      float fractionLost = msg[0] / 255.0f;
-      int32_t cumLost = ((msg[1] << 24) + (msg[2] << 16) + (msg[3] << 8) >> 8);
-      uint32_t highSeqNb = msg[4]  + (msg[5] << 8) + (msg[6] << 16) + (msg[7] << 24);
+      //float fractionLost = msg[0] / 255.0f;
+      //int32_t cumLost = ((msg[1] << 24) + (msg[2] << 16) + (msg[3] << 8)) >> 8;
+      //uint32_t highSeqNb = msg[4] + (msg[5] << 8) + (msg[6] << 16) + (msg[7] << 24);
     }
 }
 

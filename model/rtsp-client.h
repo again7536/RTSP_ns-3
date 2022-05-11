@@ -1,3 +1,5 @@
+/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
+
 /*
 
 three-gpp-http-Client.h랑 Client.java 참고해서 만들었습니다.
@@ -28,7 +30,7 @@ class RtspClient : public Application
 public:
     static TypeId GetTypeId (void);
     RtspClient();
-    ~RtspClient();
+    virtual ~RtspClient();
 
 private:
     /**************************************************
@@ -46,9 +48,9 @@ private:
     /**************************************************
     *                    메소드
     ***************************************************/
-    void DoDispose();
-    void StartApplication();
-    void StopApplication();
+    virtual void DoDispose();
+    virtual void StartApplication();
+    virtual void StopApplication();
 
     void ScheduleRtpSend();
 
