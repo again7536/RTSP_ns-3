@@ -13,6 +13,7 @@
 #include <ns3/socket.h>
 #include <ns3/tcp-socket.h>
 #include <ns3/tcp-socket-factory.h>
+#include <ns3/udp-socket-factory.h>
 #include <ns3/inet-socket-address.h>
 #include <ns3/inet6-socket-address.h>
 #include <ns3/unused.h>
@@ -116,40 +117,30 @@ RtspServer::StartApplication ()
         m_state = READY;
 
         /* 
-          RTP 소켓 초기화 
+          RTP 소켓 초기화 (보내는 용이라서 바인딩 안함)
         */
         if (m_rtpSocket == 0)
         {
-          TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
-          m_rtpSocket = Socket::CreateSocket (GetNode (), tid);
-
-          const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
-          InetSocketAddress local = InetSocketAddress (ipv4, m_rtpPort);
-          if (m_rtpSocket->Bind (local) == -1)
-            {
-              NS_FATAL_ERROR ("Failed to bind RTP socket");
-            }
+          m_rtpSocket = Socket::CreateSocket (GetNode (), UdpSocketFactory::GetTypeId ());
         }
         NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
-        m_rtpSocket->SetRecvCallback (MakeCallback (&RtspServer::HandleRtpReceive, this));
 
         /* 
-          RTCP 소켓 초기화 
+          RTCP 소켓 초기화
         */
-        // if (m_rtcpSocket == 0)
-        // {
-        //   TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
-        //   m_rtcpSocket = Socket::CreateSocket (GetNode (), tid);
-
-        //   const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
-        //   InetSocketAddress local = InetSocketAddress (ipv4, m_rtcpPort);
-        //   if (m_rtcpSocket->Bind (local) == -1)
-        //     {
-        //       NS_FATAL_ERROR ("Failed to bind RTCP socket");
-        //     }
-        // }
-        // NS_ASSERT_MSG (m_rtcpSocket != 0, "Failed creating RTCP socket.");
-        // m_rtcpSocket->SetRecvCallback (MakeCallback (&RtspServer::HandleRtcpReceive, this));
+        if (m_rtcpSocket == 0)
+        {
+          m_rtcpSocket = Socket::CreateSocket (GetNode (), UdpSocketFactory::GetTypeId ());
+          
+          const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
+          InetSocketAddress local = InetSocketAddress (ipv4, m_rtcpPort);
+          if (m_rtcpSocket->Bind (local) == -1)
+            {
+              NS_FATAL_ERROR ("Failed to bind RTCP socket");
+            }
+        }
+        NS_ASSERT_MSG (m_rtcpSocket != 0, "Failed creating RTCP socket.");
+        m_rtcpSocket->SetRecvCallback (MakeCallback (&RtspServer::HandleRtcpReceive, this));
     }
     else
     {
@@ -209,7 +200,7 @@ RtspServer::NewConnectionCreatedCallback (Ptr<Socket> socket, const Address &add
    * as a new connection. The statement below attempts to fetch the data from
    * that packet, if any.
    */
-  HandleRtcpReceive (socket);
+  HandleRtspReceive (socket);
 }
 
 //RTSP handler
@@ -248,26 +239,6 @@ RtspServer::HandleRtspReceive (Ptr<Socket> socket)
     NS_LOG_INFO("Server request type: " << request_type);
 
     delete msg;
-  }
-}
-
-//RTP handler
-void
-RtspServer::HandleRtpReceive(Ptr<Socket> socket)
-{
-  NS_LOG_FUNCTION (this << socket);
-
-  Ptr<Packet> packet;
-  Address from;
-  Address localAddress;
-  while ((packet = socket->RecvFrom (from)))
-  {
-    socket->GetSockName (localAddress);
-
-    if(m_clientAddress != from)
-    {
-      m_clientAddress = from;
-    }
   }
 }
 

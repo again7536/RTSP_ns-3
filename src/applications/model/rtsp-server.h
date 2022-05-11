@@ -56,8 +56,6 @@ private:
     void HandleRtspReceive (Ptr<Socket> socket);
     //Send RTSP Response
     void SendCallback (Ptr<Socket> socket, uint32_t availableBufferSize);
-    //Handle RTP Request
-    void HandleRtpReceive (Ptr<Socket> socket);
     //Handle RTCP Request
     void HandleRtcpReceive (Ptr<Socket> socket);
 

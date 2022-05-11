@@ -122,23 +122,15 @@ RtspClient::StartApplication ()
         }
     }
     NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
-
     m_rtpSocket->SetRecvCallback (MakeCallback (&RtspClient::HandleRtpReceive, this));
 
-    /* RTCP 소켓 초기화 */
+    /* RTCP 소켓 초기화 (보내는 용이라서 바인딩 안함) */
     if (m_rtcpSocket == 0)
     {
         TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
         m_rtcpSocket = Socket::CreateSocket (GetNode (), tid);
-        InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny (), m_rtcpPort);
-        if (m_rtcpSocket->Bind (local) == -1)
-        {
-            NS_FATAL_ERROR ("Failed to bind socket");
-        }
     }
-    NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
-
-    m_rtpSocket->SetRecvCallback (MakeCallback (&RtspClient::HandleRtcpReceive, this));
+    NS_ASSERT_MSG (m_rtcpSocket != 0, "Failed creating RTP socket.");
 
     m_sendEvent = Simulator::Schedule(Seconds(0.1), &RtspClient::SendRtspPacket, this);
 } // end of `void StartApplication ()`
@@ -186,6 +178,7 @@ RtspClient::HandleRtspReceive (Ptr<Socket> socket)
 }
 
 //RTSP Sender
+//현재는 테스트 용으로 타이머 돌면서 Play 보내도록함
 void
 RtspClient::SendRtspPacket ()
 {
@@ -216,21 +209,6 @@ RtspClient::HandleRtpReceive(Ptr<Socket> socket)
     uint8_t* msg = new uint8_t[packet->GetSize()+1];
     packet->CopyData(msg, packet->GetSize());
   }
-}
-
-//RTCP handler
-void
-RtspClient::HandleRtcpReceive(Ptr<Socket> socket)
-{
-  NS_LOG_FUNCTION (this << socket);
-
-  Ptr<Packet> packet;
-  Address from;
-  Address localAddress;
-  while ((packet = socket->RecvFrom (from)))
-  {
-    socket->GetSockName (localAddress);
-  }   
 }
 
 }
