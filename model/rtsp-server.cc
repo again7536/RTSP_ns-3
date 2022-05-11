@@ -1,5 +1,6 @@
 #include "rtsp-server.h"
 
+#include <sstream>
 #include <ns3/log.h>
 #include <ns3/simulator.h>
 #include <ns3/callback.h>
@@ -32,25 +33,32 @@ RtspServer::GetTypeId (void)
                     "The local address of the server, "
                     "i.e., the address on which to bind the Rx socket.",
                     AddressValue (),
-                    MakeAddressAccessor (&ThreeGppHttpServer::m_localAddress),
+                    MakeAddressAccessor (&RtspServer::m_localAddress),
                     MakeAddressChecker ())
-        .AddAttribute ("LocalPort",
+        .AddAttribute ("RtspPort",
                     "Port on which the application listen for incoming packets.",
                     UintegerValue (80), // the default HTTP port
-                    MakeUintegerAccessor (&ThreeGppHttpServer::m_localPort),
+                    MakeUintegerAccessor (&RtspServer::m_rtspPort),
+                    MakeUintegerChecker<uint16_t> ())
+        .AddAttribute ("RtpPort",
+                    "Port on which the application listen for incoming packets.",
+                    UintegerValue (80), // the default HTTP port
+                    MakeUintegerAccessor (&RtspServer::m_rtpPort),
+                    MakeUintegerChecker<uint16_t> ())
+        .AddAttribute ("RtcpPort",
+                    "Port on which the application listen for incoming packets.",
+                    UintegerValue (80), // the default HTTP port
+                    MakeUintegerAccessor (&RtspServer::m_rtcpPort),
                     MakeUintegerChecker<uint16_t> ())
     ;
     return tid;
 }
 
-RtspServer::RtspServer () : m_lossCounter (0) 
+RtspServer::RtspServer ()
 {
     NS_LOG_FUNCTION (this);
     
     m_sendDelay = FRAME_PERIOD;
-    m_received = 0;
-
-    buf = new char[20000];
 }
 
 void
@@ -73,89 +81,77 @@ RtspServer::StartApplication ()
 
     if (m_state == INIT)
     {
-        if (m_initialSocket == 0)
+        /*
+          RTSP 소켓 초기화
+        */
+        if (m_rtspSocket == 0)
         {
-            // Find the current default MTU value of TCP sockets.
-            Ptr<const ns3::AttributeValue> previousSocketMtu;
-            const TypeId tcpSocketTid = TcpSocket::GetTypeId ();
-            for (uint32_t i = 0; i < tcpSocketTid.GetAttributeN (); i++)
-            {
-                struct TypeId::AttributeInformation attrInfo = tcpSocketTid.GetAttribute (i);
-                if (attrInfo.name == "SegmentSize")
-                {
-                    previousSocketMtu = attrInfo.initialValue;
-                }
-            }
+          // Find the current default MTU value of TCP sockets.
+          Ptr<const ns3::AttributeValue> previousSocketMtu;
+          const TypeId tcpSocketTid = TcpSocket::GetTypeId ();
+          for (uint32_t i = 0; i < tcpSocketTid.GetAttributeN (); i++)
+          {
+              struct TypeId::AttributeInformation attrInfo = tcpSocketTid.GetAttribute (i);
+              if (attrInfo.name == "SegmentSize")
+              {
+                  previousSocketMtu = attrInfo.initialValue;
+              }
+          }
 
-            // Creating a TCP socket to connect to the server.
-            m_initialSocket = Socket::CreateSocket (GetNode (),
-                                                    TcpSocketFactory::GetTypeId ());
-            m_initialSocket->SetAttribute ("SegmentSize", UintegerValue (m_mtuSize));
+          // Creating a TCP socket to connect to the server.
+          m_rtspSocket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
 
-            int ret;
-
-            if (Ipv4Address::IsMatchingType (m_localAddress))
-            {
-                const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
-                const InetSocketAddress inetSocket = InetSocketAddress (ipv4,
-                                                                        m_rtspPort);
-                NS_LOG_INFO (this << " Binding on " << ipv4
-                                    << " port " << m_rtspPort
-                                    << " / " << inetSocket << ".");
-                ret = m_initialSocket->Bind (inetSocket);
-                NS_LOG_DEBUG (this << " Bind() return value= " << ret
-                                    << " GetErrNo= "
-                                    << m_initialSocket->GetErrno () << ".");
-            }
-            else if (Ipv6Address::IsMatchingType (m_localAddress))
-            {
-                const Ipv6Address ipv6 = Ipv6Address::ConvertFrom (m_localAddress);
-                const Inet6SocketAddress inet6Socket = Inet6SocketAddress (ipv6,
-                                                                            m_rtspPort);
-                NS_LOG_INFO (this << " Binding on " << ipv6
-                                    << " port " << m_localPort
-                                    << " / " << inet6Socket << ".");
-                ret = m_initialSocket->Bind (inet6Socket);
-                NS_LOG_DEBUG (this << " Bind() return value= " << ret
-                                    << " GetErrNo= "
-                                    << m_initialSocket->GetErrno () << ".");
-            }
-
-            ret = m_initialSocket->Listen ();
-            NS_LOG_DEBUG (this << " Listen () return value= " << ret
-                                << " GetErrNo= " << m_initialSocket->GetErrno ()
-                                << ".");
-
-            NS_UNUSED (ret);
-
-        } // end of `if (m_initialSocket == 0)`
-
-        NS_ASSERT_MSG (m_initialSocket != 0, "Failed creating socket.");
-
-        // 여기서부터 소켓 콜백 작성 필요
-        // 아래는 http 예시
-
-        // m_initialSocket->SetAcceptCallback (MakeCallback (&ThreeGppHttpServer::ConnectionRequestCallback,
-        //                                                     this),
-        //                                     MakeCallback (&ThreeGppHttpServer::NewConnectionCreatedCallback,
-        //                                                     this));
-        // m_initialSocket->SetCloseCallbacks (MakeCallback (&ThreeGppHttpServer::NormalCloseCallback,
-        //                                                     this),
-        //                                     MakeCallback (&ThreeGppHttpServer::ErrorCloseCallback,
-        //                                                     this));
-        // m_initialSocket->SetRecvCallback (MakeCallback (&ThreeGppHttpServer::ReceivedDataCallback,
-        //                                                 this));
-        // m_initialSocket->SetSendCallback (MakeCallback (&ThreeGppHttpServer::SendCallback,
-        //                                                 this));
+          if (Ipv4Address::IsMatchingType (m_localAddress))
+          {
+              const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
+              const InetSocketAddress inetSocket = InetSocketAddress (ipv4, m_rtspPort);
+              if (m_rtpSocket->Bind (inetSocket) == -1)
+              {
+                NS_FATAL_ERROR ("Failed to bind socket");
+              }
+          }
+          m_rtspSocket->Listen ();
+        }
+        NS_ASSERT_MSG (m_rtspSocket != 0, "Failed creating RTSP socket.");
+        m_rtspSocket->SetRecvCallback (MakeCallback (&HandleRtspReceive, this));
         m_state = READY;
 
-    } // end of `if (m_state == NOT_STARTED)`
+        /* 
+          RTP 소켓 초기화 
+        */
+        if (m_rtpSocket == 0)
+        {
+          TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+          m_rtpSocket = Socket::CreateSocket (GetNode (), tid);
+          InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny (), m_rtpPort);
+          if (m_rtpSocket->Bind (local) == -1)
+            {
+              NS_FATAL_ERROR ("Failed to bind socket");
+            }
+        }
+        NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
+        m_rtpSocket->SetRecvCallback (MakeCallback (&HandleRtpReceive, this));
+
+        /* 
+          RTCP 소켓 초기화 
+        */
+        if (m_rtcpSocket == 0)
+        {
+          TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+          m_rtcpSocket = Socket::CreateSocket (GetNode (), tid);
+          InetSocketAddress local = InetSocketAddress (Ipv4Address::GetAny (), m_rtcpPort);
+          if (m_rtcpSocket->Bind (local) == -1)
+            {
+              NS_FATAL_ERROR ("Failed to bind socket");
+            }
+        }
+        NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
+        m_rtpSocket->SetRecvCallback (MakeCallback (&HandleRtcpReceive, this));
+    }
     else
     {
-      NS_FATAL_ERROR ("Invalid state " << GetStateString ()
-                                       << " for StartApplication().");
+      NS_FATAL_ERROR ("Invalid state for StartApplication().");
     }
-
 } // end of `void StartApplication ()`
 
 void
@@ -165,20 +161,115 @@ RtspServer::StopApplication ()
 
   m_state = INIT;
 
-  // Close all accepted sockets.
-  // m_txBuffer->CloseAllSockets ();
-
   // Stop listening.
-  if (m_initialSocket != 0)
+  if (m_rtspSocket != 0)
     {
-      m_initialSocket->Close ();
-      m_initialSocket->SetAcceptCallback (MakeNullCallback<bool, Ptr<Socket>, const Address &> (),
+      m_rtspSocket->Close ();
+      m_rtspSocket->SetAcceptCallback (MakeNullCallback<bool, Ptr<Socket>, const Address &> (),
                                           MakeNullCallback<void, Ptr<Socket>, const Address &> ());
-      m_initialSocket->SetCloseCallbacks (MakeNullCallback<void, Ptr<Socket> > (),
+      m_rtspSocket->SetCloseCallbacks (MakeNullCallback<void, Ptr<Socket> > (),
                                           MakeNullCallback<void, Ptr<Socket> > ());
-      m_initialSocket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
-      m_initialSocket->SetSendCallback (MakeNullCallback<void, Ptr<Socket>, uint32_t > ());
+      m_rtspSocket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+      m_rtspSocket->SetSendCallback (MakeNullCallback<void, Ptr<Socket>, uint32_t > ());
     }
+  if (m_rtpSocket != 0) 
+  {
+    m_rtpSocket->Close();
+    m_rtpSocket->SetRecvCallback (MakeNullCallback<void, Ptr<Socket> > ());
+  }
+}
+
+//RTSP handler
+void
+RtspServer::HandleRtspReceive (Ptr<Socket> socket)
+{
+  Ptr<Packet> packet;
+  while((packet = socket->Recv()))
+  {
+    if (packet->GetSize () == 0)
+    {
+      break;
+    }
+    uint8_t* msg = new uint8_t[packet->GetSize()+1];
+    packet->CopyData(msg, packet->GetSize());
+    std::istringstream strin(std::string((char*)msg), std::ios::in);
+
+    State_t request_type;
+    char line[200];
+    strin.getline(line, 200);
+    // convert to request_type structure:
+    if (strncmp(line, "SETUP", 5) == 0)
+        request_type = SETUP;
+    else if (strncmp(line, "PLAY", 4) == 0)
+        request_type = PLAY;
+    else if (strncmp(line, "PLAY", 5) == 0)
+        request_type = PAUSE;
+    else if (strncmp(line, "TEARDOWN", 8) == 0)
+        request_type = TEARDOWN;
+    else if (strncmp(line, "DESCRIBE", 8) == 0)
+        request_type = DESCRIBE;
+
+    std::cout<<request_type<<'\n';
+
+    delete msg;
+  }
+}
+
+//RTP handler
+void
+RtspServer::HandleRtpReceive(Ptr<Socket> socket)
+{
+  NS_LOG_FUNCTION (this << socket);
+
+  Ptr<Packet> packet;
+  Address from;
+  Address localAddress;
+  while ((packet = socket->RecvFrom (from)))
+  {
+    socket->GetSockName (localAddress);
+
+    if(m_clientAddress != from)
+    {
+      m_clientAddress = from;
+    }
+  }
+}
+
+//RTCP handler
+void
+RtspServer::HandleRtcpReceive(Ptr<Socket> socket)
+{
+  NS_LOG_FUNCTION (this << socket);
+
+  Ptr<Packet> packet;
+  Address from;
+  Address localAddress;
+  while ((packet = socket->RecvFrom (from)))
+    {
+      socket->GetSockName (localAddress);
+
+      if(m_clientAddress != from)
+      {
+        m_clientAddress = from;
+      }
+      uint8_t* msg = new uint8_t[packet->GetSize()+1];
+      packet->CopyData(msg, packet->GetSize());
+      float fractionLost = msg[0] / 255.0f;
+      int32_t cumLost = ((msg[1] << 24) + (msg[2] << 16) + (msg[3] << 8) >> 8);
+      uint32_t highSeqNb = msg[4]  + (msg[5] << 8) + (msg[6] << 16) + (msg[7] << 24);
+    }
+}
+
+//Rtp 패킷을 m_sendDelay 마다 반복해서 보냄
+void
+RtspServer::ScheduleRtpSend()
+{
+  if(m_rtpSocket == 0) return;
+
+  Ptr<Packet> packet = Create<Packet>(1500);
+  m_rtpSocket->SendTo(packet, 0, m_clientAddress);
+  
+  Simulator::Schedule(Seconds(m_sendDelay), &RtspServer::ScheduleRtpSend, this);
 }
 
 /* 자유롭게 추가 */
