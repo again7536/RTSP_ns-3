@@ -58,13 +58,22 @@ private:
     Ptr<Socket> m_rtspSocket;
     Ptr<Socket> m_rtpSocket;
     Ptr<Socket> m_rtcpSocket;
-    Address m_localAddress;          //Client IP address
-    Address m_remoteAddress;         //Client IP address
-    uint16_t m_rtpPort;          //destination port for RTP packets  (given by the RTSP Client)
-    uint16_t m_rtcpPort;
-    uint16_t m_rtspPort;
+    
+    Address m_localAddress;                 //클라이언트 IP
+    Address m_remoteAddress;                //서버 IP
+    uint16_t m_rtpPort;                     //RTP 포트
+    uint16_t m_rtcpPort;                    //RTCP 포트
+    uint16_t m_rtspPort;                    //RTSP 포트
 
-    EventId m_sendEvent;
+    EventId m_sendEvent;                    //RTSP 전송 타이머 이벤트
+
+    uint8_t* m_frameBuf;                    //RTP 프레임 버퍼
+
+    uint32_t m_expSeq;                      // 다음 예상 시퀀스
+    uint32_t m_highSeq;                     // 현재 최대 시퀀스
+    uint32_t m_cumLost;                     // 누적 lost 시퀀스
+
+    const static int RTCP_PERIOD = 400;     //RTCP 전송 주기
 };
 
 }

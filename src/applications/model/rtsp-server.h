@@ -22,6 +22,7 @@ three-gpp-http-server.h랑 server.java 참고해서 만들었습니다.
 #include <ns3/traced-callback.h>
 #include <ns3/socket.h>
 #include <ostream>
+#include <sstream>
 
 namespace ns3 {
 
@@ -68,46 +69,43 @@ private:
 
     void ScheduleRtpSend();
 
+    //구현 대상 #2
+    void OpenFileStream();
+
     /**************************************************
     *                      변수
     ***************************************************/
     Ptr<Socket> m_rtspSocket;
     Ptr<Socket> m_rtpSocket;
     Ptr<Socket> m_rtcpSocket;
-    Address m_localAddress;          //Server IP address
-    Address m_clientAddress;         //Client IP address
-    uint16_t m_rtpPort;          //destination port for RTP packets  (given by the RTSP Client)
-    uint16_t m_rtcpPort;
-    uint16_t m_rtspPort;
+    
+    Address     m_localAddress;             //서버 IP 주소
+    Address     m_clientAddress;            //클라이언트 IP 주소
+    uint16_t    m_rtpPort;                  //RTP 소켓 포트
+    uint16_t    m_rtcpPort;                 //RTCP 소켓 포트
+    uint16_t    m_rtspPort;                 //RTSP 소켓 포트
 
-    uint32_t m_imagenb;               //image nb of the image currently transmitted
-    //VideoStream video;             //VideoStream object used to access video frames
-
-    //Timer timer;                   //timer used to send the images at the video frame rate
-    //byte[] buf;                    //buffer used to store the images to send to the client 
-    uint64_t m_sendDelay;                 //the delay to send images over the wire. Ideally should be
-                                     //equal to the frame rate of the video file, but may be 
-                                     //adjusted when congestion is detected.
-
+    std::string m_fileName;                 //전송 파일 이름
+    std::stringstream m_fileStream;         //전송 파일 스트림
+    
     //RTSP variables
     //----------------
-    int m_seqNum;
-    State_t m_state = INIT;
+    int m_seqNum;                           //현재 전송된 시퀀스 넘버
+    State_t m_state = INIT;                 //현재 서버 상태
+                                            //서버 상태에 따라서 전송 / 전송 중지
     
-    const static int FRAME_PERIOD = 100; //Frame period of the video to stream, in ms
-    const static int MJPEG_TYPE = 26;    //RTP payload type for MJPEG video
-    const static int VIDEO_LENGTH = 500; //length of the video in frames
+    const static int FRAME_PERIOD = 100;    // 프레임 간격 (1초 / 동영상의 프레임 레이트)
 
     //RTCP variables
     //----------------
-    int m_congestionLevel;
- 
-    const static int RTCP_RCV_PORT = 19001; //port where the client will receive the RTP packets
-    const static int RTCP_PERIOD = 400;     //How often to check for control events
+    int m_congestionLevel;                  //congestion이 있을 경우 영상 압축하여 프레임 축소
+                                            //여기에서는 프레임 전송 바이트에 해당 변수를 나누는 식
 
     //RTP variables
     //----------------
-    EventId         m_sendEvent;
+    EventId         m_sendEvent;            //RTP 전송 타이머 이벤트
+    uint8_t*        m_frameBuf;             //RTP 전송 버퍼
+    uint64_t        m_sendDelay;            //RTP 패킷 전송 딜레이
 };
 
 }

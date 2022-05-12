@@ -39,18 +39,23 @@ RtspServer::GetTypeId (void)
                     MakeAddressChecker ())
         .AddAttribute ("RtspPort",
                     "Port on which the application listen for incoming packets.",
-                    UintegerValue (80), // the default HTTP port
+                    UintegerValue (9), // the default HTTP port
                     MakeUintegerAccessor (&RtspServer::m_rtspPort),
-                    MakeUintegerChecker<uint16_t> ())
-        .AddAttribute ("RtpPort",
-                    "Port on which the application listen for incoming packets.",
-                    UintegerValue (80), // the default HTTP port
-                    MakeUintegerAccessor (&RtspServer::m_rtpPort),
                     MakeUintegerChecker<uint16_t> ())
         .AddAttribute ("RtcpPort",
                     "Port on which the application listen for incoming packets.",
-                    UintegerValue (80), // the default HTTP port
+                    UintegerValue (10), // the default HTTP port
                     MakeUintegerAccessor (&RtspServer::m_rtcpPort),
+                    MakeUintegerChecker<uint16_t> ())
+        .AddAttribute ("RtpPort",
+                    "Port on which the application listen for incoming packets.",
+                    UintegerValue (11), // the default HTTP port
+                    MakeUintegerAccessor (&RtspServer::m_rtpPort),
+                    MakeUintegerChecker<uint16_t> ())
+        .AddAttribute ("SendDelay",
+                    "Frame send delay.",
+                    UintegerValue (RtspServer::FRAME_PERIOD), // the default HTTP port
+                    MakeUintegerAccessor (&RtspServer::m_sendDelay),
                     MakeUintegerChecker<uint16_t> ())
     ;
     return tid;
@@ -63,6 +68,10 @@ RtspServer::RtspServer ()
     m_rtcpPort = 10;
     m_rtpPort = 11;
     m_sendDelay = FRAME_PERIOD;
+    m_frameBuf = new uint8_t[50000];
+    memset(m_frameBuf, '1', 50000);
+
+    m_congestionLevel = 1;
 }
 
 RtspServer::~RtspServer ()
@@ -117,11 +126,17 @@ RtspServer::StartApplication ()
         m_state = READY;
 
         /* 
-          RTP 소켓 초기화 (보내는 용이라서 바인딩 안함)
+          RTP 소켓 초기화
         */
         if (m_rtpSocket == 0)
         {
           m_rtpSocket = Socket::CreateSocket (GetNode (), UdpSocketFactory::GetTypeId ());
+          const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
+          InetSocketAddress local = InetSocketAddress (ipv4, m_rtpPort);
+          if (m_rtpSocket->Bind (local) == -1)
+          {
+            NS_FATAL_ERROR ("Failed to bind RTP socket");
+          }
         }
         NS_ASSERT_MSG (m_rtpSocket != 0, "Failed creating RTP socket.");
 
@@ -131,7 +146,6 @@ RtspServer::StartApplication ()
         if (m_rtcpSocket == 0)
         {
           m_rtcpSocket = Socket::CreateSocket (GetNode (), UdpSocketFactory::GetTypeId ());
-          
           const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
           InetSocketAddress local = InetSocketAddress (ipv4, m_rtcpPort);
           if (m_rtcpSocket->Bind (local) == -1)
@@ -146,8 +160,6 @@ RtspServer::StartApplication ()
     {
       NS_FATAL_ERROR ("Invalid state for StartApplication().");
     }
-    
-    // m_sendEvent = Simulator::Schedule(Seconds(0), &RtspServer::ScheduleRtpSend, this);
 } // end of `void StartApplication ()`
 
 void
@@ -190,6 +202,8 @@ RtspServer::NewConnectionCreatedCallback (Ptr<Socket> socket, const Address &add
   // socket->SetCloseCallbacks (MakeCallback (&ThreeGppHttpServer::NormalCloseCallback, this),
   //                            MakeCallback (&ThreeGppHttpServer::ErrorCloseCallback, this));
   socket->SetRecvCallback (MakeCallback (&RtspServer::HandleRtspReceive, this));
+  m_clientAddress = address;
+  m_sendEvent = Simulator::Schedule(Seconds(0), &RtspServer::ScheduleRtpSend, this);
   /*
    * A typical connection is established after receiving an empty (i.e., no
    * data) TCP packet with ACK flag. The actual data will follow in a separate
@@ -243,6 +257,9 @@ RtspServer::HandleRtspReceive (Ptr<Socket> socket)
 }
 
 //RTCP handler
+/*
+  
+*/
 void
 RtspServer::HandleRtcpReceive(Ptr<Socket> socket)
 {
@@ -275,10 +292,11 @@ RtspServer::ScheduleRtpSend()
 
   NS_ASSERT (m_sendEvent.IsExpired ());
 
-  Ptr<Packet> packet = Create<Packet>(1500);
+  Ptr<Packet> packet = Create<Packet>(m_frameBuf, 10000);
   m_rtpSocket->SendTo(packet, 0, m_clientAddress);
+  NS_LOG_INFO("Server Send: "<< 10000);
   
-  m_sendEvent = Simulator::Schedule(Seconds(m_sendDelay), &RtspServer::ScheduleRtpSend, this);
+  m_sendEvent = Simulator::Schedule(MilliSeconds(m_sendDelay), &RtspServer::ScheduleRtpSend, this);
 }
 
 /* 자유롭게 추가 */
