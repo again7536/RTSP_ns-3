@@ -74,6 +74,8 @@ private:
     uint32_t m_cumLost;                     // 누적 lost 시퀀스
 
     const static int RTCP_PERIOD = 400;     //RTCP 전송 주기
+
+    int32_t m_requestMode;                  //RTSP Request Mode
 };
 
 }

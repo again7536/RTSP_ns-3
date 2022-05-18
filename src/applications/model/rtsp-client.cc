@@ -147,6 +147,8 @@ RtspClient::StartApplication ()
     }
     NS_ASSERT_MSG (m_rtcpSocket != 0, "Failed creating RTP socket.");
 
+    m_requestMode = 0; // Request 초기화
+
     m_sendEvent = Simulator::Schedule(Seconds(0.1), &RtspClient::SendRtspPacket, this);
 } // end of `void StartApplication ()`
 
@@ -193,17 +195,56 @@ RtspClient::HandleRtspReceive (Ptr<Socket> socket)
 }
 
 //RTSP Sender
-//현재는 테스트 용으로 타이머 돌면서 Play 보내도록함
+//input?
 void
 RtspClient::SendRtspPacket ()
 {
   NS_LOG_FUNCTION(this);
 
   NS_ASSERT (m_sendEvent.IsExpired ());
-  uint8_t buf[100] = "PLAY\n";
+  uint8_t buf[100];
+
+  /* 모든 request를 한번씩 보냄 */
+  if(m_requestMode == 0)
+    strcpy((char *)buf,"SETUP\n");
+  else if(m_requestMode == 1)
+    strcpy((char *)buf,"PLAY\n");
+  else if(m_requestMode == 2)
+    strcpy((char *)buf,"PAUSE\n");
+  else if(m_requestMode == 3)
+    strcpy((char *)buf,"TEARDOWN\n");
+  else if(m_requestMode == 4)
+    strcpy((char *)buf,"DESCRIBE\n");
+  else
+    strcpy((char *)buf,"PLAY\n");
+  m_requestMode++;
+  
+  
   Ptr<Packet> packet = Create<Packet>(buf, 100);
   int ret = m_rtspSocket->Send(packet);
-  NS_LOG_INFO("Client Send: " << ret);
+  
+  if (Ipv4Address::IsMatchingType (m_remoteAddress))
+  {
+    NS_LOG_INFO ("Client sent " << ret << " bytes to " <<
+                  Ipv4Address::ConvertFrom (m_remoteAddress) << " port " << m_rtspPort);
+  }
+  else if (Ipv6Address::IsMatchingType (m_remoteAddress))
+  {
+    NS_LOG_INFO ("client sent " << ret << " bytes to " <<
+                  Ipv6Address::ConvertFrom (m_remoteAddress) << " port " << m_rtspPort);
+  }
+  else if (InetSocketAddress::IsMatchingType (m_remoteAddress))
+  {
+    NS_LOG_INFO ("client sent " << ret << " bytes to " <<
+                  InetSocketAddress::ConvertFrom (m_remoteAddress).GetIpv4 () << 
+                  " port " << InetSocketAddress::ConvertFrom (m_remoteAddress).GetPort ());
+  }
+  else if (Inet6SocketAddress::IsMatchingType (m_remoteAddress))
+  {
+    NS_LOG_INFO ("client sent " << ret << " bytes to " <<
+                  Inet6SocketAddress::ConvertFrom (m_remoteAddress).GetIpv6 () << 
+                  " port " << Inet6SocketAddress::ConvertFrom (m_remoteAddress).GetPort ());
+  }
   
   m_sendEvent = Simulator::Schedule(Seconds(1), &RtspClient::SendRtspPacket, this);
 }
