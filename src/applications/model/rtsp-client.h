@@ -76,6 +76,8 @@ private:
     const static int RTCP_PERIOD = 400;     //RTCP 전송 주기
 
     int32_t m_requestMode;                  //RTSP Request Mode
+
+    std::string m_fileName;                 //video file name
 };
 
 }

@@ -91,7 +91,8 @@ main (int argc, char *argv[])
   // client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
   // client.SetAttribute ("Interval", TimeValue (interPacketInterval));
   // client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
-
+  client.SetAttribute ("FileName", StringValue ("Test.mp4")); // set File name
+  
   apps = client.Install (n.Get (0));
   apps.Start (Seconds (2.0));
   apps.Stop (Seconds (10.0));

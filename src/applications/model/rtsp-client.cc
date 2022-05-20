@@ -17,6 +17,7 @@
 #include <ns3/inet-socket-address.h>
 #include <ns3/inet6-socket-address.h>
 #include <ns3/unused.h>
+#include <ns3/string.h>
 
 namespace ns3 {
 
@@ -52,6 +53,11 @@ RtspClient::GetTypeId (void)
                     UintegerValue (11), // the default HTTP port
                     MakeUintegerAccessor (&RtspClient::m_rtpPort),
                     MakeUintegerChecker<uint16_t> ())
+        .AddAttribute ("FileName",
+                   "Name of file.",
+                   StringValue ("sample.mp4"),
+                   MakeStringAccessor (&RtspClient::m_fileName),
+                   MakeStringChecker ())
     ;
     return tid;
 }
@@ -206,23 +212,24 @@ RtspClient::SendRtspPacket ()
 
   /* 모든 request를 한번씩 보냄 */
   if(m_requestMode == 0)
-    strcpy((char *)buf,"SETUP\n");
+    strcpy((char *)buf,"SETUP ");
   else if(m_requestMode == 1)
-    strcpy((char *)buf,"PLAY\n");
+    strcpy((char *)buf,"PLAY ");
   else if(m_requestMode == 2)
-    strcpy((char *)buf,"PAUSE\n");
+    strcpy((char *)buf,"PAUSE ");
   else if(m_requestMode == 3)
-    strcpy((char *)buf,"TEARDOWN\n");
+    strcpy((char *)buf,"TEARDOWN ");
   else if(m_requestMode == 4)
-    strcpy((char *)buf,"DESCRIBE\n");
+    strcpy((char *)buf,"DESCRIBE ");
   else
-    strcpy((char *)buf,"PLAY\n");
+    strcpy((char *)buf,"PLAY ");
   m_requestMode++;
-  
+
+  strcat((char *)buf, m_fileName.c_str()); // Add filename to packet buf
   
   Ptr<Packet> packet = Create<Packet>(buf, 100);
   int ret = m_rtspSocket->Send(packet);
-  
+
   if (Ipv4Address::IsMatchingType (m_remoteAddress))
   {
     NS_LOG_INFO ("Client sent " << ret << " bytes to " <<
