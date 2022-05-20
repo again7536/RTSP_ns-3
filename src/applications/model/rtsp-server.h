@@ -23,6 +23,7 @@ three-gpp-http-server.h랑 server.java 참고해서 만들었습니다.
 #include <ns3/socket.h>
 #include <ostream>
 #include <sstream>
+#include <vector>
 
 namespace ns3 {
 
@@ -84,6 +85,9 @@ private:
     uint16_t    m_rtpPort;                  //RTP 소켓 포트
     uint16_t    m_rtcpPort;                 //RTCP 소켓 포트
     uint16_t    m_rtspPort;                 //RTSP 소켓 포트
+    
+    std::vector<int> m_frameSizes;          //전송 frame Size 배열
+    int m_count;                            //전송할 총 packet 개수
 
     std::string m_fileName;                 //전송 파일 이름
     std::stringstream m_fileStream;         //전송 파일 스트림

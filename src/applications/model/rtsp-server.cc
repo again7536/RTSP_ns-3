@@ -1,6 +1,11 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 #include <ns3/rtsp-server.h>
 
+#include <string>
+#include <fstream>
+#include <vector>
+#include "seq-ts-header.h"
+
 #include <sstream>
 #include <ns3/log.h>
 #include <ns3/simulator.h>
@@ -72,6 +77,10 @@ RtspServer::RtspServer ()
     memset(m_frameBuf, '1', 50000);
 
     m_congestionLevel = 1;
+    
+    m_frameSizes.resize(0);
+    m_count = 0;
+    m_seqNum = 0;
 }
 
 RtspServer::~RtspServer ()
@@ -96,6 +105,25 @@ void
 RtspServer::StartApplication ()
 {
     NS_LOG_FUNCTION (this);
+
+    /*
+        frames.txt에서 frame별 size 받아와서 m_frameSizes에 store. 
+    */ 
+    std::ifstream fin ("frames.txt");
+    NS_LOG_INFO ("File open: " << fin.is_open () ); 
+    if (fin.is_open ()) {
+        char frameSize_string[10];
+        int frameSize_int = 0;
+        while (fin.getline (frameSize_string, sizeof(frameSize_string))) {
+            std::stringstream ssInt(frameSize_string);
+            ssInt >> frameSize_int;
+
+            m_frameSizes.push_back(frameSize_int);
+        }
+        m_count = m_frameSizes.size();
+    }
+
+    fin.close();
 
     if (m_state == INIT)
     {
@@ -288,16 +316,33 @@ RtspServer::HandleRtcpReceive(Ptr<Socket> socket)
 void
 RtspServer::ScheduleRtpSend()
 {
-  NS_LOG_FUNCTION(this);
+    NS_LOG_FUNCTION(this);
 
-  NS_ASSERT (m_sendEvent.IsExpired ());
+    NS_ASSERT (m_sendEvent.IsExpired ());
 
-  Ptr<Packet> packet = Create<Packet>(m_frameBuf, 10000);
-  m_rtpSocket->SendTo(packet, 0, m_clientAddress);
-  NS_LOG_INFO("Server Send: "<< 10000);
-  
-  m_sendEvent = Simulator::Schedule(MilliSeconds(m_sendDelay), &RtspServer::ScheduleRtpSend, this);
+    //header seqTs에 현재 seqNum 저장
+    SeqTsHeader seqTs;
+    seqTs.SetSeq (m_seqNum);
+    // congestionLevel에 따른 frame 크기 설정
+    int frameSize_congestion = m_frameSizes[m_seqNum] / m_congestionLevel;
+
+    //seqTs header만큼의 크기를 제외한 packet 생성
+    Ptr<Packet> packet = Create<Packet>(frameSize_congestion - (8+4));
+    //packet에 header 추가
+    packet->AddHeader (seqTs);
+    
+    // client로 헤더 전송
+    m_rtpSocket->SendTo(packet, 0, m_clientAddress);
+    NS_LOG_INFO("Server Send: "<< m_frameSizes[m_seqNum]);
+    m_seqNum++;
+
+    //현재까지 보낸 packet의 양이 보내야 할 packet의 총 양보다 작고, 현재 서버의 상태가 PLAYING이면 Send 메소드를 스케줄러에 추가.
+    if (m_seqNum < m_count && m_state == PLAYING) {
+        m_sendEvent = Simulator::Schedule(MilliSeconds(m_sendDelay), &RtspServer::ScheduleRtpSend, this);
+    }
 }
+  
+   
 
 /* 자유롭게 추가 */
 
