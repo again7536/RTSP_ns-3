@@ -295,6 +295,9 @@ RtspServer::HandleRtspReceive (Ptr<Socket> socket)
     while(line[request_byte]!="\n"){
         m_filename+=line[request_byte++];
     }
+
+    NS_LOG_INFO("Requested file name: " << m_filename);
+    
     delete msg;
   }
 }
