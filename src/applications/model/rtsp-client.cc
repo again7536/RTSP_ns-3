@@ -211,6 +211,7 @@ RtspClient::SendRtspPacket ()
   uint8_t buf[100];
 
   /* 모든 request를 한번씩 보냄 */
+  // Simply Sending all request to test request works fine in server 
   if(m_requestMode == 0)
     strcpy((char *)buf,"SETUP ");
   else if(m_requestMode == 1)
@@ -225,6 +226,8 @@ RtspClient::SendRtspPacket ()
     strcpy((char *)buf,"PLAY ");
   m_requestMode++;
 
+
+  // 파일 이름은 attribute에 추가되고 RtspTest.cc 에서 수정 가능(command로 추가?)
   strcat((char *)buf, m_fileName.c_str()); // Add filename to packet buf
   
   Ptr<Packet> packet = Create<Packet>(buf, 100);
