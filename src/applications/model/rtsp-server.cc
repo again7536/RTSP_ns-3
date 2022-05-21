@@ -306,6 +306,26 @@ RtspServer::HandleRtcpReceive(Ptr<Socket> socket)
       }
       uint8_t* msg = new uint8_t[packet->GetSize()+1];
       packet->CopyData(msg, packet->GetSize());
+      
+      int32_t sum_fraction = (msg[3] << 24) + (msg[2] << 16) + (msg[1] << 8) + msg[0];
+      float fractionLost = sum_fraction / 4294967295.0f;
+
+      if(fractionLost >= 0 && fractionLost <= 0.01){
+	      m_congestionLevel = 0;
+      }
+      else if(fractionLost > 0.01 && fractionLost <= 0.25){
+	      m_congestionLevel = 1;
+      }
+      else if(fractionLost > 0.25 && fractionLost <= 0.5){
+	      m_congestionLevel = 2;
+      }
+      else if(fractionLost > 0.5 && fractionLost <= 0.75){
+	      m_congestionLevel = 3;
+      }
+      else{
+	      m_congestionLevel = 4;
+      }
+      
       //float fractionLost = msg[0] / 255.0f;
       //int32_t cumLost = ((msg[1] << 24) + (msg[2] << 16) + (msg[3] << 8)) >> 8;
       //uint32_t highSeqNb = msg[4] + (msg[5] << 8) + (msg[6] << 16) + (msg[7] << 24);
