@@ -91,9 +91,17 @@ main (int argc, char *argv[])
   // client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
   // client.SetAttribute ("Interval", TimeValue (interPacketInterval));
   // client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
-  client.SetAttribute ("FileName", StringValue ("Test.mp4")); // set File name
+  client.SetAttribute ("FileName", StringValue ("./scratch/frame.txt")); // set File name
   
   apps = client.Install (n.Get (0));
+
+  //manually set message
+  Ptr<RtspClient> rtspClient = DynamicCast<RtspClient>(apps.Get(0));
+  rtspClient->ScheduleMessage(Seconds(2), RtspClient::SETUP);
+  rtspClient->ScheduleMessage(Seconds(3), RtspClient::PLAY);
+  rtspClient->ScheduleMessage(Seconds(4), RtspClient::PAUSE);
+  rtspClient->ScheduleMessage(Seconds(5), RtspClient::PLAY);
+
   apps.Start (Seconds (2.0));
   apps.Stop (Seconds (10.0));
 

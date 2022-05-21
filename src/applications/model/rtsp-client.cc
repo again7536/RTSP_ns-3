@@ -1,6 +1,6 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 
-#include <ns3/rtsp-client.h>
+#include "rtsp-client.h"
 
 #include <sstream>
 #include <ns3/log.h>
@@ -55,7 +55,7 @@ RtspClient::GetTypeId (void)
                     MakeUintegerChecker<uint16_t> ())
         .AddAttribute ("FileName",
                    "Name of file.",
-                   StringValue ("sample.mp4"),
+                   StringValue ("sample.txt"),
                    MakeStringAccessor (&RtspClient::m_fileName),
                    MakeStringChecker ())
     ;
@@ -153,16 +153,28 @@ RtspClient::StartApplication ()
     }
     NS_ASSERT_MSG (m_rtcpSocket != 0, "Failed creating RTP socket.");
 
-    m_requestMode = 0; // Request 초기화
-
-    m_sendEvent = Simulator::Schedule(Seconds(0.1), &RtspClient::SendRtspPacket, this);
+    for(auto item: m_preSchedule) 
+    {
+        m_rtspSendEvents.push_back(Simulator::Schedule(
+          item.first, 
+          &RtspClient::SendRtspPacket, 
+          this,
+          item.second,
+          m_rtspSendEvents.size()
+        ));
+    }
 } // end of `void StartApplication ()`
 
 void
 RtspClient::StopApplication ()
 {
   NS_LOG_FUNCTION (this);
-  Simulator::Cancel(m_sendEvent);
+
+  for(auto event: m_rtspSendEvents)
+  {
+      event.Cancel();
+  }
+
   // Stop listening.
   if (m_rtspSocket != 0)
     {
@@ -181,6 +193,13 @@ RtspClient::StopApplication ()
   }
 }
 
+//Schedule RTSP Message in prior
+void
+RtspClient::ScheduleMessage (Time time, RtspClient::Method_t requestMethod)
+{
+  m_preSchedule[time] = requestMethod;
+}
+
 //RTSP handler
 void
 RtspClient::HandleRtspReceive (Ptr<Socket> socket)
@@ -195,40 +214,52 @@ RtspClient::HandleRtspReceive (Ptr<Socket> socket)
     uint8_t* msg = new uint8_t[packet->GetSize()+1];
     packet->CopyData(msg, packet->GetSize());
     std::istringstream strin(std::string((char*)msg), std::ios::in);
+
+    //strin.getline();
     
     delete msg;
   }
 }
 
 //RTSP Sender
-//input?
 void
-RtspClient::SendRtspPacket ()
+RtspClient::SendRtspPacket (RtspClient::Method_t requestMethod, int64_t idx)
 {
   NS_LOG_FUNCTION(this);
 
-  NS_ASSERT (m_sendEvent.IsExpired ());
+  auto event = m_rtspSendEvents[idx];
+
+  NS_ASSERT (event.IsExpired ());
+  NS_ASSERT (!Simulator::IsFinished());
+
   uint8_t buf[100];
 
-  /* 모든 request를 한번씩 보냄 */
-  // Simply Sending all request to test request works fine in server 
-  if(m_requestMode == 0)
-    strcpy((char *)buf,"SETUP ");
-  else if(m_requestMode == 1)
-    strcpy((char *)buf,"PLAY ");
-  else if(m_requestMode == 2)
-    strcpy((char *)buf,"PAUSE ");
-  else if(m_requestMode == 3)
-    strcpy((char *)buf,"TEARDOWN ");
-  else if(m_requestMode == 4)
-    strcpy((char *)buf,"DESCRIBE ");
+  //SETUP일 경우 파일명 붙임
+  if(requestMethod == SETUP)
+  {
+    strcpy((char *)buf,"SETUP\n");
+    strcat((char *)buf, m_fileName.c_str());
+  }
+  else if(requestMethod == PLAY)
+  {
+    strcpy((char *)buf,"PLAY\n");
+  }
+  else if(requestMethod == PAUSE)
+  {
+    strcpy((char *)buf,"PAUSE\n");
+  }
+  else if(requestMethod == TEARDOWN)
+  {
+    strcpy((char *)buf,"TEARDOWN\n");
+  }
+  else if(requestMethod == DESCRIBE)
+  {
+    strcpy((char *)buf,"DESCRIBE\n");
+  }
   else
-    strcpy((char *)buf,"PLAY ");
-  m_requestMode++;
-
-
-  // 파일 이름은 attribute에 추가되고 RtspTest.cc 에서 수정 가능(command로 추가?)
-  strcat((char *)buf, m_fileName.c_str()); // Add filename to packet buf
+  {
+    strcpy((char *)buf,"PLAY\n");
+  }
   
   Ptr<Packet> packet = Create<Packet>(buf, 100);
   int ret = m_rtspSocket->Send(packet);
@@ -238,25 +269,6 @@ RtspClient::SendRtspPacket ()
     NS_LOG_INFO ("Client sent " << ret << " bytes to " <<
                   Ipv4Address::ConvertFrom (m_remoteAddress) << " port " << m_rtspPort);
   }
-  else if (Ipv6Address::IsMatchingType (m_remoteAddress))
-  {
-    NS_LOG_INFO ("client sent " << ret << " bytes to " <<
-                  Ipv6Address::ConvertFrom (m_remoteAddress) << " port " << m_rtspPort);
-  }
-  else if (InetSocketAddress::IsMatchingType (m_remoteAddress))
-  {
-    NS_LOG_INFO ("client sent " << ret << " bytes to " <<
-                  InetSocketAddress::ConvertFrom (m_remoteAddress).GetIpv4 () << 
-                  " port " << InetSocketAddress::ConvertFrom (m_remoteAddress).GetPort ());
-  }
-  else if (Inet6SocketAddress::IsMatchingType (m_remoteAddress))
-  {
-    NS_LOG_INFO ("client sent " << ret << " bytes to " <<
-                  Inet6SocketAddress::ConvertFrom (m_remoteAddress).GetIpv6 () << 
-                  " port " << Inet6SocketAddress::ConvertFrom (m_remoteAddress).GetPort ());
-  }
-  
-  m_sendEvent = Simulator::Schedule(Seconds(1), &RtspClient::SendRtspPacket, this);
 }
 
 //RTP handler

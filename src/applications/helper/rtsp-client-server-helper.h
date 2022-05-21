@@ -143,7 +143,10 @@ public:
      */
   ApplicationContainer Install (NodeContainer c);
 
+  void ScheduleMessage(Time time, RtspClient::Method_t requestMethod);
+
 private:
+  Ptr<RtspClient> m_client;
   ObjectFactory m_factory; //!< Object factory.
 };
 

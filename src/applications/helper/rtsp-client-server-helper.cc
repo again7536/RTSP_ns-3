@@ -73,17 +73,17 @@ RtspClientHelper::RtspClientHelper ()
   m_factory.SetTypeId (RtspClient::GetTypeId ());
 }
 
+RtspClientHelper::RtspClientHelper (Address address)
+{
+  m_factory.SetTypeId (RtspClient::GetTypeId ());
+  SetAttribute ("RemoteAddress", AddressValue (address));
+}
+
 RtspClientHelper::RtspClientHelper (Address address, uint16_t port)
 {
   m_factory.SetTypeId (RtspClient::GetTypeId ());
   SetAttribute ("RemoteAddress", AddressValue (address));
   SetAttribute ("RemotePort", UintegerValue (port));
-}
-
-RtspClientHelper::RtspClientHelper (Address address)
-{
-  m_factory.SetTypeId (RtspClient::GetTypeId ());
-  SetAttribute ("RemoteAddress", AddressValue (address));
 }
 
 void
@@ -99,9 +99,9 @@ RtspClientHelper::Install (NodeContainer c)
   for (NodeContainer::Iterator i = c.Begin (); i != c.End (); ++i)
     {
       Ptr<Node> node = *i;
-      Ptr<RtspClient> client = m_factory.Create<RtspClient> ();
-      node->AddApplication (client);
-      apps.Add (client);
+      m_client = m_factory.Create<RtspClient> ();
+      node->AddApplication (m_client);
+      apps.Add (m_client);
     }
   return apps;
 }

@@ -22,7 +22,7 @@ three-gpp-http-server.h랑 server.java 참고해서 만들었습니다.
 #include <ns3/traced-callback.h>
 #include <ns3/socket.h>
 #include <ostream>
-#include <sstream>
+#include <fstream>
 #include <vector>
 
 namespace ns3 {
@@ -90,11 +90,11 @@ private:
     int m_count;                            //전송할 총 packet 개수
 
     std::string m_fileName;                 //전송 파일 이름
-    std::stringstream m_fileStream;         //전송 파일 스트림
+    std::ifstream m_fileStream;             //전송 파일 스트림
     
     //RTSP variables
     //----------------
-    int m_seqNum;                           //현재 전송된 시퀀스 넘버
+    uint32_t m_seqNum;                      //현재 전송된 시퀀스 넘버
     State_t m_state = INIT;                 //현재 서버 상태
                                             //서버 상태에 따라서 전송 / 전송 중지
     
@@ -102,7 +102,7 @@ private:
 
     //RTCP variables
     //----------------
-    int m_congestionLevel;                  //congestion이 있을 경우 영상 압축하여 프레임 축소
+    int32_t m_congestionLevel;              //congestion이 있을 경우 영상 압축하여 프레임 축소
                                             //여기에서는 프레임 전송 바이트에 해당 변수를 나누는 식
 
     //RTP variables

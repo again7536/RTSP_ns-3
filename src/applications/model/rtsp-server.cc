@@ -1,10 +1,10 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
-#include <ns3/rtsp-server.h>
+#include "rtsp-server.h"
+#include "seq-ts-header.h"
 
 #include <string>
 #include <fstream>
 #include <vector>
-#include "seq-ts-header.h"
 
 #include <sstream>
 #include <ns3/log.h>
@@ -105,25 +105,6 @@ void
 RtspServer::StartApplication ()
 {
     NS_LOG_FUNCTION (this);
-
-    /*
-        frames.txt에서 frame별 size 받아와서 m_frameSizes에 store. 
-    */ 
-    std::ifstream fin ("frames.txt");
-    NS_LOG_INFO ("File open: " << fin.is_open () ); 
-    if (fin.is_open ()) {
-        char frameSize_string[10];
-        int frameSize_int = 0;
-        while (fin.getline (frameSize_string, sizeof(frameSize_string))) {
-            std::stringstream ssInt(frameSize_string);
-            ssInt >> frameSize_int;
-
-            m_frameSizes.push_back(frameSize_int);
-        }
-        m_count = m_frameSizes.size();
-    }
-
-    fin.close();
 
     if (m_state == INIT)
     {
@@ -267,16 +248,37 @@ RtspServer::HandleRtspReceive (Ptr<Socket> socket)
     char line[200];
     strin.getline(line, 200);
 
-    if (strncmp(line, "SETUP", 5) == 0)
-        request_type = SETUP;
-    else if (strncmp(line, "PLAY", 3) == 0)
-        request_type = PLAY;
+    //SETUP인 경우에 파일 열어서 보내기 시작
+    if (strncmp(line, "SETUP", 5) == 0) {
+      //이미 열려있는 경우 파일 스트림을 닫고 다시 엶
+      if(m_fileStream.is_open())
+      {
+        m_fileStream.close();
+      }
+      strin.getline(line, 200);
+      m_fileStream.open(line);
+
+      NS_LOG_INFO ("File open: " << m_fileStream.is_open () ); 
+    }
+    else if (strncmp(line, "PLAY", 4) == 0)
+    {
+      m_state = PLAYING;
+    }
     else if (strncmp(line, "PAUSE", 5) == 0)
-        request_type = PAUSE;
+    {
+      m_state = READY;
+    }
+    //TEARDOWN인 경우에 파일 스트림 종료
     else if (strncmp(line, "TEARDOWN", 8) == 0)
-        request_type = TEARDOWN;
-    else if (strncmp(line, "DESCRIBE", 8) == 0)
-        request_type = DESCRIBE;
+    {
+      m_fileStream.close();
+
+      NS_LOG_INFO ("File close: " << !m_fileStream.is_open () ); 
+    }
+    else if (strncmp(line, "DESCRIBE", 8) == 0) 
+    {
+      request_type = DESCRIBE;
+    }
 
     NS_LOG_INFO("Server request type: " << request_type);
 
@@ -320,26 +322,25 @@ RtspServer::ScheduleRtpSend()
 
     NS_ASSERT (m_sendEvent.IsExpired ());
 
-    //header seqTs에 현재 seqNum 저장
-    SeqTsHeader seqTs;
-    seqTs.SetSeq (m_seqNum);
-    // congestionLevel에 따른 frame 크기 설정
-    int frameSize_congestion = m_frameSizes[m_seqNum] / m_congestionLevel;
+    if(!m_fileStream.eof() && m_state == PLAYING) {
+      //header seqTs에 현재 seqNum 저장
+      SeqTsHeader seqTs;
+      seqTs.SetSeq (m_seqNum);
 
-    //seqTs header만큼의 크기를 제외한 packet 생성
-    Ptr<Packet> packet = Create<Packet>(frameSize_congestion - (8+4));
-    //packet에 header 추가
-    packet->AddHeader (seqTs);
-    
-    // client로 헤더 전송
-    m_rtpSocket->SendTo(packet, 0, m_clientAddress);
-    NS_LOG_INFO("Server Send: "<< m_frameSizes[m_seqNum]);
-    m_seqNum++;
+      // congestionLevel에 따른 frame 크기 설정
+      uint32_t frameSize;
+      m_fileStream >> frameSize;
+      uint32_t frameSizeCongestion = frameSize / m_congestionLevel;
 
-    //현재까지 보낸 packet의 양이 보내야 할 packet의 총 양보다 작고, 현재 서버의 상태가 PLAYING이면 Send 메소드를 스케줄러에 추가.
-    if (m_seqNum < m_count && m_state == PLAYING) {
-        m_sendEvent = Simulator::Schedule(MilliSeconds(m_sendDelay), &RtspServer::ScheduleRtpSend, this);
+      Ptr<Packet> packet = Create<Packet>(frameSizeCongestion);
+      packet->AddHeader (seqTs);
+      
+      m_rtpSocket->SendTo(packet, 0, m_clientAddress);
+      NS_LOG_INFO("Server Send: "<< frameSizeCongestion << " bytes in "<< m_seqNum);
+      m_seqNum++;
     }
+
+    m_sendEvent = Simulator::Schedule(MilliSeconds(m_sendDelay), &RtspServer::ScheduleRtpSend, this);
 }
   
    

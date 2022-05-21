@@ -22,6 +22,8 @@ three-gpp-http-Client.h랑 Client.java 참고해서 만들었습니다.
 #include <ns3/traced-callback.h>
 #include <ns3/socket.h>
 #include <ostream>
+#include <map>
+#include <queue>
 
 namespace ns3 {
 
@@ -32,6 +34,17 @@ public:
     RtspClient();
     virtual ~RtspClient();
 
+    enum Method_t
+    {
+        //rtsp message types
+        SETUP,
+        PLAY,
+        PAUSE,
+        TEARDOWN,
+        DESCRIBE
+    };
+
+    void ScheduleMessage (Time time, Method_t requestMethod);
 private:
     /**************************************************
     *                   소켓 콜백
@@ -50,7 +63,7 @@ private:
     virtual void StartApplication();
     virtual void StopApplication();
 
-    void SendRtspPacket();
+    void SendRtspPacket(Method_t requestMethod, int64_t idx);
 
     /**************************************************
     *                      변수
@@ -65,8 +78,6 @@ private:
     uint16_t m_rtcpPort;                    //RTCP 포트
     uint16_t m_rtspPort;                    //RTSP 포트
 
-    EventId m_sendEvent;                    //RTSP 전송 타이머 이벤트
-
     uint8_t* m_frameBuf;                    //RTP 프레임 버퍼
 
     uint32_t m_expSeq;                      // 다음 예상 시퀀스
@@ -75,9 +86,10 @@ private:
 
     const static int RTCP_PERIOD = 400;     //RTCP 전송 주기
 
-    int32_t m_requestMode;                  //RTSP Request Mode
-
     std::string m_fileName;                 //video file name
+    
+    std::map<Time, Method_t> m_preSchedule;     
+    std::vector<EventId> m_rtspSendEvents;      //RTSP 전송 예약 이벤트
 };
 
 }
