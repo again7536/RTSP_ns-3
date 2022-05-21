@@ -265,21 +265,36 @@ RtspServer::HandleRtspReceive (Ptr<Socket> socket)
 
     State_t request_type;
     char line[200];
+    int request_byte;
     strin.getline(line, 200);
 
-    if (strncmp(line, "SETUP", 5) == 0)
+    if (strncmp(line, "SETUP", 5) == 0){
         request_type = SETUP;
-    else if (strncmp(line, "PLAY", 3) == 0)
+	request_byte = 6;
+    }
+    else if (strncmp(line, "PLAY", 4) == 0){
         request_type = PLAY;
-    else if (strncmp(line, "PAUSE", 5) == 0)
+	request_byte = 5;
+    }
+    else if (strncmp(line, "PAUSE", 5) == 0){
         request_type = PAUSE;
-    else if (strncmp(line, "TEARDOWN", 8) == 0)
+	request_byte = 6;
+    }
+    else if (strncmp(line, "TEARDOWN", 8) == 0){
         request_type = TEARDOWN;
-    else if (strncmp(line, "DESCRIBE", 8) == 0)
+	request_byte = 9;
+    }
+    else if (strncmp(line, "DESCRIBE", 8) == 0){
         request_type = DESCRIBE;
+	request_byte = 9;
+    }
 
     NS_LOG_INFO("Server request type: " << request_type);
 
+    m_filename="";
+    while(line[request_byte]!="\n"){
+        m_filename+=line[request_byte++];
+    }
     delete msg;
   }
 }
