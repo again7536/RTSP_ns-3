@@ -38,16 +38,18 @@ NS_LOG_COMPONENT_DEFINE ("RtspTest");
 int
 main (int argc, char *argv[])
 {
-//
-// Enable logging for UdpClient and
-//
+  //
+  // Enable logging for UdpClient and
+  //
   LogComponentEnable ("RtspServer", LOG_LEVEL_INFO);
   LogComponentEnable ("RtspClient", LOG_LEVEL_INFO);
+  LogComponentEnable ("RtspTest", LOG_LEVEL_INFO);
 
   Address serverAddress;
-//
-// Explicitly create the nodes required by the topology (shown above).
-//
+  Address clientAddress;
+  //
+  // Explicitly create the nodes required by the topology (shown above).
+  //
   NS_LOG_INFO ("Create nodes.");
   NodeContainer n;
   n.Create (2);
@@ -56,43 +58,42 @@ main (int argc, char *argv[])
   internet.Install (n);
 
   NS_LOG_INFO ("Create channels.");
-//
-// Explicitly create the channels required by the topology (shown above).
-//
+  //
+  // Explicitly create the channels required by the topology (shown above).
+  //
   PointToPointHelper p2p;
   p2p.SetDeviceAttribute("DataRate", StringValue("5Mbps"));
   p2p.SetChannelAttribute("Delay", StringValue("10us"));
   NetDeviceContainer d = p2p.Install (n);
 
-//
-// We've got the "hardware" in place.  Now we need to add IP addresses.
-//
+  //
+  // We've got the "hardware" in place.  Now we need to add IP addresses.
+  //
   NS_LOG_INFO ("Assign IP Addresses.");
   Ipv4AddressHelper ipv4;
   ipv4.SetBase ("10.1.1.0", "255.255.255.0");
   Ipv4InterfaceContainer i = ipv4.Assign (d);
+  clientAddress = Address (i.GetAddress (0));
   serverAddress = Address (i.GetAddress (1));
 
   NS_LOG_INFO ("Create Applications.");
-//
-// Create one udpServer applications on node one.
-//
+  //
+  // Create one udpServer applications on node one.
+  //
   RtspServerHelper server(serverAddress);
   ApplicationContainer apps = server.Install (n.Get (1));
   apps.Start (Seconds (1.0));
-  apps.Stop (Seconds (10.0));
+  apps.Stop (Seconds (20.0));
 
-//
-// Create one UdpClient application to send UDP datagrams from node zero to
-// node one.
-//
-
-  RtspClientHelper client(serverAddress);
+  //
+  // Create one UdpClient application to send UDP datagrams from node zero to
+  // node one.
+  //
+  RtspClientHelper client(serverAddress, clientAddress);
   // client.SetAttribute ("MaxPackets", UintegerValue (maxPacketCount));
   // client.SetAttribute ("Interval", TimeValue (interPacketInterval));
   // client.SetAttribute ("PacketSize", UintegerValue (MaxPacketSize));
   client.SetAttribute ("FileName", StringValue ("./scratch/frame.txt")); // set File name
-  
   apps = client.Install (n.Get (0));
 
   //manually set message
@@ -103,13 +104,13 @@ main (int argc, char *argv[])
   rtspClient->ScheduleMessage(Seconds(5), RtspClient::PLAY);
 
   apps.Start (Seconds (2.0));
-  apps.Stop (Seconds (10.0));
+  apps.Stop (Seconds (20.0));
 
-//
-// Now, do the actual simulation.
-//
+
+  // Now, do the actual simulation.
   NS_LOG_INFO ("Run Simulation.");
   Simulator::Run ();
+  Simulator::Stop(Seconds(21.0));
   Simulator::Destroy ();
   NS_LOG_INFO ("Done.");
 }

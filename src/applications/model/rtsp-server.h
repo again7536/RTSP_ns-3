@@ -40,12 +40,6 @@ public:
         INIT,
         READY,
         PLAYING,
-        //rtsp message types
-        SETUP,
-        PLAY,
-        PAUSE,
-        TEARDOWN,
-        DESCRIBE
     };
 
 private:
@@ -98,12 +92,13 @@ private:
     State_t m_state = INIT;                 //현재 서버 상태
                                             //서버 상태에 따라서 전송 / 전송 중지
     
-    const static int FRAME_PERIOD = 100;    // 프레임 간격 (1초 / 동영상의 프레임 레이트)
+    const static int FRAME_PERIOD = 32;     // 프레임 간격 (1초 / 동영상의 프레임 레이트)
 
     //RTCP variables
     //----------------
     int32_t m_congestionLevel;              //congestion이 있을 경우 영상 압축하여 프레임 축소
                                             //여기에서는 프레임 전송 바이트에 해당 변수를 나누는 식
+    int32_t m_upscale;
 
     //RTP variables
     //----------------

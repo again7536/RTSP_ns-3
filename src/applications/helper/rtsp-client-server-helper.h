@@ -103,18 +103,6 @@ public:
    *
    */
   RtspClientHelper ();
-
-  /**
-   *  Create RtspClientHelper which will make life easier for people trying
-   * to set up simulations with udp-client-server. Use this variant with
-   * addresses that do not include a port value (e.g., Ipv4Address and
-   * Ipv6Address).
-   *
-   * \param ip The IP address of the remote UDP server
-   * \param port The port number of the remote UDP server
-   */
-
-  RtspClientHelper (Address ip, uint16_t port);
   /**
    *  Create RtspClientHelper which will make life easier for people trying
    * to set up simulations with udp-client-server. Use this variant with
@@ -124,7 +112,7 @@ public:
    * \param addr The address of the remote UDP server
    */
 
-  RtspClientHelper (Address addr);
+  RtspClientHelper (Address serverAddr, Address localAddr);
 
   /**
    * Record an attribute to be set in each Application after it is is created.

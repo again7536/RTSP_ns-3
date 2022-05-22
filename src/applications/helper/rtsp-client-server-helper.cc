@@ -73,17 +73,11 @@ RtspClientHelper::RtspClientHelper ()
   m_factory.SetTypeId (RtspClient::GetTypeId ());
 }
 
-RtspClientHelper::RtspClientHelper (Address address)
+RtspClientHelper::RtspClientHelper (Address serverAddr, Address localAddr)
 {
   m_factory.SetTypeId (RtspClient::GetTypeId ());
-  SetAttribute ("RemoteAddress", AddressValue (address));
-}
-
-RtspClientHelper::RtspClientHelper (Address address, uint16_t port)
-{
-  m_factory.SetTypeId (RtspClient::GetTypeId ());
-  SetAttribute ("RemoteAddress", AddressValue (address));
-  SetAttribute ("RemotePort", UintegerValue (port));
+  SetAttribute ("RemoteAddress", AddressValue (serverAddr));
+  SetAttribute("LocalAddress", AddressValue(localAddr));
 }
 
 void
