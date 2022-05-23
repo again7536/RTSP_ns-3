@@ -386,9 +386,10 @@ RtspClient::ConsumeBuffer()
 
   NS_ASSERT(m_consumeEvent.IsExpired());
 
+  std::map<uint32_t, uint8_t*>::iterator frame;
   if(m_state == PLAYING)
   {
-    if(m_frameMap.find(m_frameExp) == m_frameMap.end())
+    if((frame = m_frameMap.find(m_frameExp)) == m_frameMap.end())
     {
       NS_LOG_INFO("Buffering occurs at: " << m_frame << ", expected " << m_frameExp);
       m_cumLost++;
@@ -397,7 +398,8 @@ RtspClient::ConsumeBuffer()
     {
       m_frame = m_frameExp;
       NS_LOG_INFO("Consumed Frame: " << m_frame);
-      m_frameMap.erase(m_frame);
+      delete frame->second;
+      m_frameMap.erase(frame);
       m_frameExp++;
     }
     m_frameCnt++;

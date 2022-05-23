@@ -62,7 +62,7 @@ main (int argc, char *argv[])
   // Explicitly create the channels required by the topology (shown above).
   //
   PointToPointHelper p2p;
-  p2p.SetDeviceAttribute("DataRate", StringValue("5Mbps"));
+  p2p.SetDeviceAttribute("DataRate", StringValue("1Mbps"));
   p2p.SetChannelAttribute("Delay", StringValue("10us"));
   NetDeviceContainer d = p2p.Install (n);
 
