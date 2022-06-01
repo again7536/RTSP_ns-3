@@ -1,10 +1,13 @@
 # RTSP_ns-3
 
 ### HOWTO
-ns-3.xx 디렉토리에서 클론 후 다시 빌드
+ns-3.xx 디렉토리에서 아래 명령어 실행
 
 ```bash
-$ root:~/ns-allinone-3.29/ns-3.29# git clone https://github.com/again7536/RTSP_ns-3.git
+$ git clone https://github.com/again7536/RTSP_ns-3.git temp
+$ mv temp/.git ./.git
+$ rm -rf temp
+$ git reset --HARD
 
 $ ./waf clean
 $ ./waf configure --enable-examples --enable-tests --build-profile=debug
