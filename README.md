@@ -15,7 +15,7 @@ $ ./waf configure --enable-examples --enable-tests --build-profile=debug
 $ ./waf
 ```
 
-실행
+테스트 파일 실행
 ```bash
 $ ./waf --run RtspTest
 ```
