@@ -2,10 +2,7 @@
 
 /*
 
-three-gpp-http-Client.h랑 Client.java 참고해서 만들었습니다.
-각자 해야하는 역할 (노션에 적은 것) 주석 달아놨으니 서치해서 
-함수/클래스 구현하면 될 것 같습니다.
-변수랑 메소드 전부 적어 놓은게 아니라서 필요하면 추가해서 쓰면 됩니다!!
+IPv6는 지원하지 않습니다.
 
 */
 
@@ -49,9 +46,12 @@ public:
         PLAY,
         PAUSE,
         TEARDOWN,
+        MODIFY,
     };
 
     void ScheduleMessage (Time time, Method_t requestMethod);
+    uint64_t GetRxSize();
+    double GetFractionLost();
 private:
     /**************************************************
     *                   소켓 콜백
@@ -74,6 +74,7 @@ private:
     void SendRtcpPacket();
     void ConsumeBuffer();
 
+
     /**************************************************
     *                      변수
     ***************************************************/
@@ -89,27 +90,30 @@ private:
 
     State_t m_state;                         // 클라이언트 상태
 
-    std::map<uint32_t, uint8_t*> m_frameMap; // RTP 프레임 버퍼
+    std::map<uint32_t, std::string> m_frameMap; // RTP 프레임 버퍼
 
-    float m_lastFractionLost;                // 마지막 lost 비율
+    const static int RTCP_PERIOD = 400;      // RTCP 전송 주기
+
+    float m_lastFractionLost;                // 마지막 loss 비율
+    float m_curFractionLost;                 // 현재 loss 비율
     uint32_t m_lastSeq;                      // RTCP를 마지막으로 보냈을 때의 RTP 시퀀스
     uint32_t m_lastLost;                     // RTCP를 마지막으로 보냈을 때의 RTP 누적 loss
-
     uint32_t m_cumLost;                      // 누적 loss 시퀀스
 
     uint32_t m_framePeriod;                  // 1초 / 프레임 레이트
     uint32_t m_frameCnt;                     // 시간을 프레임 단위로 나타냄  
-    uint32_t m_frameExp;                     // 재생 해야할 프레임
     uint32_t m_frame;                        // 재생 중 프레임
 
-    const static int RTCP_PERIOD = 400;      // RTCP 전송 주기
-
-    std::string m_fileName;                  // video file name
+    std::string m_fileName;                  // 비디오 파일 이름
     
     std::map<Time, Method_t> m_preSchedule;     
     std::vector<EventId> m_rtspSendEvents;   // RTSP 전송 예약 이벤트
     EventId m_consumeEvent;                  // 프레임 소모 이벤트
     EventId m_rtcpSendEvent;                 // RTCP 전송 이벤트
+
+    uint64_t m_rxSize;                       // throughput
+
+    ns3::TracedCallback<float &> m_fractionLossTrace; // fractionLoss 트레이스
 };
 
 }

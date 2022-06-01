@@ -2,10 +2,7 @@
 
 /*
 
-three-gpp-http-server.h랑 server.java 참고해서 만들었습니다.
-각자 해야하는 역할 (노션에 적은 것) 주석 달아놨으니 서치해서 
-함수/클래스 구현하면 될 것 같습니다.
-변수랑 메소드 전부 적어 놓은게 아니라서 필요하면 추가해서 쓰면 됩니다!!
+IPv6는 지원하지 않습니다.
 
 */
 
@@ -40,6 +37,7 @@ public:
         INIT,
         READY,
         PLAYING,
+        MODIFY,
     };
 
 private:
@@ -63,8 +61,6 @@ private:
     virtual void StopApplication();
 
     void ScheduleRtpSend();
-
-    //구현 대상 #2
     void OpenFileStream();
 
     /**************************************************
@@ -96,15 +92,20 @@ private:
 
     //RTCP variables
     //----------------
-    int32_t m_congestionLevel;              //congestion이 있을 경우 영상 압축하여 프레임 축소
+    const double MAX_CONGESTION_LEVEL = 16;
+    const double MIN_CONGESTION_LEVEL = 1;
+    double m_congestionLevel;               //congestion이 있을 경우 영상 압축하여 프레임 축소
                                             //여기에서는 프레임 전송 바이트에 해당 변수를 나누는 식
+    double m_congestionThreshold;           //로스가 일어난 최소 레벨 기록 후에 그 레벨을 못넘게함
+    bool m_useCongestionThreshold;          //컨제스쳔 기준을 설정할지 말지
     int32_t m_upscale;
 
     //RTP variables
     //----------------
     EventId         m_sendEvent;            //RTP 전송 타이머 이벤트
-    uint8_t*        m_frameBuf;             //RTP 전송 버퍼
     uint64_t        m_sendDelay;            //RTP 패킷 전송 딜레이
+
+    ns3::TracedCallback<double &> m_congestionLevelTrace; // trace callback
 };
 
 }

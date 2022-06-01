@@ -20,9 +20,9 @@
 #include <ns3/unused.h>
 #include <ns3/string.h>
 
-namespace ns3 {
-
 NS_LOG_COMPONENT_DEFINE("RtspClient");
+
+namespace ns3 {
 
 NS_OBJECT_ENSURE_REGISTERED(RtspClient);
 
@@ -40,24 +40,24 @@ RtspClient::GetTypeId (void)
                     MakeAddressAccessor (&RtspClient::m_remoteAddress),
                     MakeAddressChecker ())
         .AddAttribute ("LocalAddress",
-                    "The local address of the server, "
+                    "The local address of the client, "
                     "i.e., the address on which to bind the Rx socket.",
                     AddressValue (),
                     MakeAddressAccessor (&RtspClient::m_localAddress),
                     MakeAddressChecker ())
         .AddAttribute ("RtspPort",
-                    "Port on which the application listen for incoming packets.",
-                    UintegerValue (9), // the default HTTP port
+                    "Rtsp Socket Port.",
+                    UintegerValue (9),
                     MakeUintegerAccessor (&RtspClient::m_rtspPort),
                     MakeUintegerChecker<uint16_t> ())
         .AddAttribute ("RtcpPort",
-                    "Port on which the application listen for incoming packets.",
-                    UintegerValue (10), // the default HTTP port
+                    "Rtcp Socket Port.",
+                    UintegerValue (10), 
                     MakeUintegerAccessor (&RtspClient::m_rtcpPort),
                     MakeUintegerChecker<uint16_t> ())
         .AddAttribute ("RtpPort",
-                    "Port on which the application listen for incoming packets.",
-                    UintegerValue (11), // the default HTTP port
+                    "Rtp Socket Port.",
+                    UintegerValue (11),
                     MakeUintegerAccessor (&RtspClient::m_rtpPort),
                     MakeUintegerChecker<uint16_t> ())
         .AddAttribute ("FileName",
@@ -65,6 +65,10 @@ RtspClient::GetTypeId (void)
                    StringValue ("sample.txt"),
                    MakeStringAccessor (&RtspClient::m_fileName),
                    MakeStringChecker ())
+        .AddTraceSource ("FractionLoss",
+                    "Rtsp Fraction Loss",
+                    MakeTraceSourceAccessor (&RtspClient::m_fractionLossTrace),
+                    "ns3::RtspClient::TracedCallback")
     ;
     return tid;
 }
@@ -80,13 +84,15 @@ RtspClient::RtspClient ()
     m_framePeriod = 10000;
 
     m_frame = 0;
-    m_frameExp = 0;
     m_frameCnt = 0;
     m_cumLost = 0;
     
     m_lastSeq = 0;
     m_lastLost = 0; 
     m_lastFractionLost = 0;
+    m_curFractionLost = 0;
+
+    m_rxSize = 0;
 }
 
 RtspClient::~RtspClient ()
@@ -117,6 +123,7 @@ RtspClient::StartApplication ()
     {
         // Creating a TCP socket to connect to the Client.
         m_rtspSocket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
+        m_rtspSocket->SetAttribute("SegmentSize", UintegerValue(1500));
 
         const Ipv4Address localIpv4 = Ipv4Address::ConvertFrom (m_localAddress);
         const InetSocketAddress localInetSocket = InetSocketAddress (localIpv4, m_rtspPort);
@@ -214,6 +221,18 @@ RtspClient::ScheduleMessage (Time time, RtspClient::Method_t requestMethod)
   m_preSchedule[time] = requestMethod;
 }
 
+uint64_t
+RtspClient::GetRxSize()
+{
+  return m_rxSize;
+}
+
+double
+RtspClient::GetFractionLost()
+{
+  return m_curFractionLost;
+}
+
 //RTSP handler
 void
 RtspClient::HandleRtspReceive (Ptr<Socket> socket)
@@ -254,6 +273,7 @@ RtspClient::HandleRtspReceive (Ptr<Socket> socket)
       else if(method.compare("PAUSE") == 0)
       {
         m_state = READY;
+        Simulator::Cancel(m_consumeEvent);
       }
       else if(method.compare("TEARDOWN") == 0)
       {
@@ -305,6 +325,10 @@ RtspClient::SendRtspPacket (RtspClient::Method_t requestMethod, int64_t idx)
     m_state = INIT;
     req << "TEARDOWN\n";
   }
+  else if(requestMethod == MODIFY)
+  {
+    req << "MODIFY\n";
+  }
   else
   {
     NS_LOG_ERROR("Invalid method");
@@ -331,13 +355,13 @@ RtspClient::SendRtcpPacket()
   std::ostringstream req;
 
   if(m_state == PLAYING) {
-    float fractionLost = 0;
     if(m_frameCnt != m_lastSeq)
-      fractionLost = ((float)m_cumLost - m_lastLost) / ((float)m_frameCnt - m_lastSeq);
-    fractionLost = (fractionLost * 0.85) + (m_lastFractionLost * 0.15);
-    req << fractionLost;
+      m_curFractionLost = ((float)m_cumLost - m_lastLost) / ((float)m_frameCnt - m_lastSeq);
+    m_curFractionLost = (m_curFractionLost * 0.85) + (m_lastFractionLost * 0.15);
+    req << m_curFractionLost;
+    m_fractionLossTrace(m_curFractionLost);
 
-    m_lastFractionLost = fractionLost;
+    m_lastFractionLost = m_curFractionLost;
   }
   else {
     req << 0;
@@ -370,9 +394,11 @@ RtspClient::HandleRtpReceive(Ptr<Socket> socket)
 
     uint32_t seq = header.GetSeq();
 
-    uint8_t* buf = new uint8_t[packet->GetSize()+1];
-    packet->CopyData(buf, packet->GetSize());
-    m_frameMap[seq] = buf;
+    std::ostringstream strout;
+    packet->CopyData(&strout, packet->GetSize());
+    m_rxSize += packet->GetSize();
+
+    m_frameMap[seq] = strout.str();
     NS_LOG_INFO("client seq: "<<seq);
     NS_LOG_INFO("Client Rtp Recv: " << packet->GetSize());
   }
@@ -386,21 +412,26 @@ RtspClient::ConsumeBuffer()
 
   NS_ASSERT(m_consumeEvent.IsExpired());
 
-  std::map<uint32_t, uint8_t*>::iterator frame;
+  auto frame = m_frameMap.begin();
   if(m_state == PLAYING)
   {
-    if((frame = m_frameMap.find(m_frameExp)) == m_frameMap.end())
+    //다음 프레임이 있다면 다음 프레임을 바로 재생함
+    if((frame = m_frameMap.lower_bound(m_frame)) == m_frameMap.end())
     {
-      NS_LOG_INFO("Buffering occurs at: " << m_frame << ", expected " << m_frameExp);
+      NS_LOG_INFO("Buffering occurs at: " << m_frame);
       m_cumLost++;
     }
     else
     {
-      m_frame = m_frameExp;
+      m_frame = frame->first;
       NS_LOG_INFO("Consumed Frame: " << m_frame);
-      delete frame->second;
-      m_frameMap.erase(frame);
-      m_frameExp++;
+      
+      //모든 이전프레임 삭제
+      auto begin = m_frameMap.begin();
+      for(;frame != begin; frame--)
+        m_frameMap.erase(frame);
+      m_frameMap.erase(begin);
+      m_frame++;
     }
     m_frameCnt++;
   }

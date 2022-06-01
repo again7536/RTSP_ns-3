@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <sstream>
+#include <ns3/core-module.h>
 #include <ns3/log.h>
 #include <ns3/simulator.h>
 #include <ns3/callback.h>
@@ -23,9 +24,9 @@
 #include <ns3/inet6-socket-address.h>
 #include <ns3/unused.h>
 
-namespace ns3 {
-
 NS_LOG_COMPONENT_DEFINE("RtspServer");
+
+namespace ns3 {
 
 NS_OBJECT_ENSURE_REGISTERED(RtspServer);
 
@@ -43,25 +44,35 @@ RtspServer::GetTypeId (void)
                     MakeAddressAccessor (&RtspServer::m_localAddress),
                     MakeAddressChecker ())
         .AddAttribute ("RtspPort",
-                    "Port on which the application listen for incoming packets.",
-                    UintegerValue (9), // the default HTTP port
+                    "Rtsp socket port.",
+                    UintegerValue (9),
                     MakeUintegerAccessor (&RtspServer::m_rtspPort),
                     MakeUintegerChecker<uint16_t> ())
         .AddAttribute ("RtcpPort",
-                    "Port on which the application listen for incoming packets.",
-                    UintegerValue (10), // the default HTTP port
+                    "Rtcp socket port.",
+                    UintegerValue (10),
                     MakeUintegerAccessor (&RtspServer::m_rtcpPort),
                     MakeUintegerChecker<uint16_t> ())
         .AddAttribute ("RtpPort",
-                    "Port on which the application listen for incoming packets.",
-                    UintegerValue (11), // the default HTTP port
+                    "Rtp socket port.",
+                    UintegerValue (11),
                     MakeUintegerAccessor (&RtspServer::m_rtpPort),
                     MakeUintegerChecker<uint16_t> ())
         .AddAttribute ("SendDelay",
                     "Frame send delay.",
-                    UintegerValue (RtspServer::FRAME_PERIOD), // the default HTTP port
+                    UintegerValue (RtspServer::FRAME_PERIOD),
                     MakeUintegerAccessor (&RtspServer::m_sendDelay),
                     MakeUintegerChecker<uint16_t> ())
+        .AddAttribute ("UseCongestionThreshold",
+                    "Enable or Disable congestion threshold.",
+                    BooleanValue(&RtspServer::m_useCongestionThreshold),
+                    MakeBooleanAccessor (&RtspServer::m_useCongestionThreshold),
+                    MakeBooleanChecker ())
+        .AddTraceSource ("CongestionLevel",
+                    "Congestion Level",
+                    MakeTraceSourceAccessor (&RtspServer::m_congestionLevelTrace),
+                    "ns3::RtspServer::TracedCallback"
+        )
     ;
     return tid;
 }
@@ -73,10 +84,10 @@ RtspServer::RtspServer ()
     m_rtcpPort = 10;
     m_rtpPort = 11;
     m_sendDelay = FRAME_PERIOD;
-    m_frameBuf = new uint8_t[50000];
-    memset(m_frameBuf, '1', 50000);
 
-    m_congestionLevel = 15;
+    m_congestionLevel = MAX_CONGESTION_LEVEL;
+    m_congestionThreshold = MAX_CONGESTION_LEVEL + 1;
+    m_useCongestionThreshold = true;
     
     m_frameSizes.resize(0);
     m_count = 0;
@@ -114,6 +125,7 @@ RtspServer::StartApplication ()
     {
       // Creating a TCP socket to connect to the server.
       m_rtspSocket = Socket::CreateSocket (GetNode (), TcpSocketFactory::GetTypeId ());
+      m_rtspSocket->SetAttribute("SegmentSize", UintegerValue(1500));
       if (Ipv4Address::IsMatchingType (m_localAddress))
       {   
           const Ipv4Address ipv4 = Ipv4Address::ConvertFrom (m_localAddress);
@@ -277,6 +289,16 @@ RtspServer::HandleRtspReceive (Ptr<Socket> socket)
     {
       m_state = READY;
     }
+    else if (method.compare("MODIFY"))
+    {
+      if(m_congestionLevel > MIN_CONGESTION_LEVEL)
+      {
+        NS_LOG_INFO("Server Congestion Modified to "<<m_congestionLevel);
+        m_congestionLevel /= 2;
+        m_congestionLevelTrace(m_congestionLevel);
+        m_congestionThreshold = MAX_CONGESTION_LEVEL + 1;
+      }
+    }
     //TEARDOWN인 경우에 파일 스트림 종료
     else if (method.compare("TEARDOWN") == 0)
     {
@@ -317,16 +339,32 @@ RtspServer::HandleRtcpReceive(Ptr<Socket> socket)
     req >> fractionLost;
 
     if(m_state == PLAYING) {
-      if(fractionLost >= 0 && fractionLost <= 0.005){
-        if(m_upscale == 2 && m_congestionLevel > 1) {
-          m_congestionLevel -= 2;
+      if(fractionLost >= 0 && fractionLost <= 0.05)
+      {
+        if(
+          m_upscale == int(MAX_CONGESTION_LEVEL + 2 - m_congestionLevel)
+          && m_congestionLevel > MIN_CONGESTION_LEVEL
+          && ( 
+              !m_useCongestionThreshold || 
+              (m_congestionThreshold > MAX_CONGESTION_LEVEL || m_congestionLevel > m_congestionThreshold)
+          )
+        ) 
+        {
+          m_congestionLevel /= 2;
           m_upscale = 0;
+          m_congestionLevelTrace(m_congestionLevel);
         }
         else m_upscale++;
       }
-      else if(fractionLost > 0.1) {
-        if(m_congestionLevel < 16)
-          m_congestionLevel += 2;
+      else if(fractionLost > 0.2) 
+      {
+        if(m_congestionLevel < MAX_CONGESTION_LEVEL) {
+          m_congestionLevelTrace(m_congestionLevel);
+          m_congestionLevel *= 2;
+        }
+        if(m_congestionThreshold > m_congestionLevel) {
+          m_congestionThreshold = m_congestionLevel;
+        }
         m_upscale = 0;
       }
     }
