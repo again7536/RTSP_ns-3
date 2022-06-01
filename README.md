@@ -2,12 +2,13 @@
 
 ### HOWTO
 ns-3.xx 디렉토리에서 아래 명령어 실행
+실행 전에 ns-3.xx/scratch 디렉토리가 비어 있어야 함
 
 ```bash
 $ git clone https://github.com/again7536/RTSP_ns-3.git temp
-$ mv temp/.git ./.git
+$ mv temp/.git .git
 $ rm -rf temp
-$ git reset --HARD
+$ git pull
 
 $ ./waf clean
 $ ./waf configure --enable-examples --enable-tests --build-profile=debug
